@@ -1,0 +1,3462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ATAS Market Research | Ultra Precision</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500;700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #070B14;
+            --hdr: #121822;
+            --brd: #1F2937;
+            --txt: #D1D5DB;
+            --up: #10B981;
+            --dn: #EF4444;
+            --cyn: #00FFFF;
+            --poc: #2962FF;
+        }
+
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100vh;
+            background: var(--bg);
+            color: var(--txt);
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        header {
+            height: 38px;
+            background: var(--hdr);
+            border-bottom: 2px solid #1A212E;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 12px; font-size: 11px; user-select: none;
+        }
+
+        .toolset { display: flex; align-items: center; gap: 15px; color: #9CA3AF; }
+        .toolset b { color: #FFF; margin-right: 4px; }
+        
+        .atas-input, .atas-select {
+            background: #1F2937; border: 1px solid #374151; color: #FFF;
+            font-size: 11px; padding: 2px 6px; width: 90px;
+            outline: none; font-weight: bold; text-transform: uppercase;
+        }
+        .atas-select { cursor: pointer; color: #00FFFF; width: auto; font-size: 10px; padding: 1px 4px; border-color: #4B5563; }
+
+        .price-badge-live { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 16px; padding-right: 40px; }
+        main { flex: 1; display: flex; position: relative; overflow: hidden; }
+        #viewport { flex: 1; position: relative; display: flex; flex-direction: column; cursor: crosshair; }
+        #scale-right { width: 85px; background: #0A0F17; border-left: 1px solid #1E293B; position: relative; cursor: ns-resize; }
+        canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+        #price-badge { position: absolute; right: 0; background: var(--dn); color: #FFF; font-family: 'Roboto Mono', monospace; font-size: 11px; padding: 2px 6px; transform: translateY(-50%); width: 83px; text-align: right; z-index: 200; border-radius: 2px 0 0 2px; pointer-events: none; }
+        .status-ohlc { position: absolute; top: 12px; left: 15px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: #94A3B8; pointer-events: none; }
+        #bottom-axis { height: 26px; background: #090D14; border-top: 1px solid #1E293B; cursor: ew-resize; }
+        #loader { position: absolute; inset: 0; background: #070B14; display: flex; align-items: center; justify-content: center; z-index: 1000; font-weight: bold; }
+        
+        #drawing-toolbar { position: absolute; left: 10px; top: 100px; display: flex; flex-direction: column; gap: 8px; z-index: 500; background: rgba(18, 24, 34, 0.8); padding: 8px; border: 1px solid #1E293B; border-radius: 4px; border-left: 2px solid #00FFFF; user-select: none; }
+        #drawing-toolbar.hidden { display: none !important; }
+        .draw-btn { width: 32px; height: 32px; background: #1F2937; border: 1px solid #374151; color: #FFF; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; border-radius: 2px; }
+        .draw-btn:hover, .draw-btn.active { background: #00FFFF; color: #000; border-color: #00FFFF; box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); }
+
+        #oi-resizer {
+            height: 4px;
+            background: #1E293B;
+            cursor: ns-resize;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+        #oi-resizer:hover, #oi-resizer.active {
+            background: #00FFFF;
+        }
+        #oi-panel-wrap, #vspd-panel-wrap {
+            height: 120px;
+            position: relative;
+            background: #060A12;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        #oi-panel-wrap canvas, #vspd-panel-wrap canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            image-rendering: pixelated;
+        }
+        #vspd-panel-wrap { height: 100px; background: #05080E; }
+        
+        #stats-panel-wrap {
+            height: 100px;
+            position: relative;
+            background: #060A12;
+            flex-shrink: 0;
+            overflow: hidden;
+            display: flex;
+            border-top: 1px solid #1E293B;
+        }
+        #stats-panel-wrap canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            image-rendering: pixelated;
+        }
+        #vspd-resizer {
+            height: 4px; background: #1E293B; cursor: ns-resize; flex-shrink: 0; z-index: 100;
+        }
+        #vspd-resizer:hover, #vspd-resizer.active { background: #FF00FF; }
+
+        /* --- MTF Heatmap HUD --- */
+        #tf-heatmap-hud {
+            position: absolute;
+            bottom: 40px;
+            left: 170px; /* Offset from Left Profile */
+            display: flex;
+            gap: 6px;
+            padding: 8px;
+            background: rgba(12, 18, 28, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            z-index: 600;
+            user-select: none;
+            transition: 0.3s;
+            pointer-events: none;
+        }
+        .tf-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 40px;
+            background: rgba(31, 41, 55, 0.5);
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .tf-cell.bull { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 0 8px rgba(16, 185, 129, 0.1); }
+        .tf-cell.bear { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 8px rgba(239, 68, 68, 0.1); }
+        .tf-cell.neut { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); }
+        
+        .tf-label { font-size: 8px; font-weight: bold; color: #94A3B8; margin-bottom: 2px; }
+        .tf-status { font-size: 10px; font-weight: bold; font-family: 'Roboto Mono', monospace; }
+        .tf-status.bull { color: #10B981; }
+        .tf-status.bear { color: #EF4444; }
+        .tf-status.neut { color: #F59E0B; }
+
+        /* ===== MOBILE RESPONSIVE ===== */
+        #bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 56px;
+            background: rgba(12,18,28,0.97);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid #1E293B;
+            z-index: 2000;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-around;
+            padding: 0 8px;
+        }
+        .bnav-btn {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 3px;
+            background: none; border: none;
+            color: #6B7280; cursor: pointer;
+            padding: 6px 16px;
+            border-radius: 10px;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 60px;
+        }
+        .bnav-btn.active { color: #00FFFF; background: rgba(0,255,255,0.08); }
+        .bnav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+        .bnav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+
+        #sheet-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2500;
+            backdrop-filter: blur(4px);
+        }
+        #bottom-sheet {
+            display: none;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #0D1421;
+            border-top: 1px solid #1E293B;
+            border-radius: 20px 20px 0 0;
+            z-index: 3000;
+            padding: 0 0 env(safe-area-inset-bottom);
+            transform: translateY(100%);
+            transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+        }
+        #bottom-sheet.open { transform: translateY(0); }
+        .sheet-handle {
+            width: 36px; height: 4px;
+            background: #374151; border-radius: 2px;
+            margin: 12px auto 0;
+        }
+        .sheet-title {
+            text-align: center;
+            font-size: 13px; font-weight: 700;
+            color: #94A3B8;
+            padding: 10px 0 14px;
+            border-bottom: 1px solid #1E293B;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .sheet-content {
+            padding: 14px 16px 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .sheet-section-title {
+            font-size: 10px; font-weight: 700;
+            color: #4B5563; letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin: 14px 0 8px;
+        }
+        .sheet-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .sheet-toggle {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 4px;
+            padding: 10px 6px;
+            background: #131C2B;
+            border: 1px solid #1E293B;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #6B7280;
+            font-size: 10px; font-weight: 700;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            letter-spacing: 0.5px;
+        }
+        .sheet-toggle.on {
+            background: rgba(0,255,255,0.08);
+            border-color: #00FFFF;
+            color: #00FFFF;
+        }
+        .sheet-toggle .st-icon { font-size: 18px; line-height: 1; }
+
+        .sheet-tf-row {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-top: 4px;
+        }
+        .sheet-tf-btn {
+            flex: 1; min-width: 60px;
+            padding: 10px 4px;
+            background: #131C2B;
+            border: 1px solid #1E293B;
+            border-radius: 10px;
+            color: #94A3B8;
+            font-size: 13px; font-weight: 700;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .sheet-tf-btn.active {
+            background: rgba(0,255,255,0.1);
+            border-color: #00FFFF;
+            color: #00FFFF;
+        }
+
+        .sheet-sym-row {
+            display: flex; gap: 8px; margin-top: 4px;
+        }
+        .sheet-sym-input {
+            flex: 1;
+            background: #131C2B;
+            border: 1px solid #374151;
+            border-radius: 10px;
+            color: #FFF;
+            font-size: 15px; font-weight: 700;
+            padding: 11px 14px;
+            text-transform: uppercase;
+            outline: none;
+        }
+        .sheet-sym-go {
+            background: #00FFFF;
+            color: #000;
+            font-weight: 700;
+            font-size: 13px;
+            border: none;
+            border-radius: 10px;
+            padding: 0 20px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 767px) {
+            #bottom-nav { display: flex; }
+            body { padding-bottom: 56px; }
+            body, html { overflow: hidden; }
+
+            header { height: 48px; padding: 0 12px; }
+            header .toolset > div:not(:first-child):not(:last-child) { display: none; }
+            header .toolset > div:last-child { display: none; }
+            #tf-heatmap-hud { display: none !important; }
+            #oi-panel-wrap, #oi-resizer, #vspd-panel-wrap, #vspd-resizer { display: none !important; }
+            #scale-right { width: 60px; }
+
+            .price-badge-live { font-size: 18px; }
+            .atas-input { font-size: 13px; width: 110px; }
+
+            #mobile-menu-btn {
+                display: flex !important;
+                align-items: center; justify-content: center;
+                width: 36px; height: 36px;
+                background: #1F2937;
+                border: 1px solid #374151;
+                border-radius: 8px;
+                color: #FFF;
+                font-size: 20px;
+                cursor: pointer;
+                margin-left: 6px;
+            }
+            #bottom-sheet { display: block; }
+            #sheet-overlay { display: block; }
+        }
+        @media (min-width: 768px) {
+            #mobile-menu-btn { display: none !important; }
+            #bottom-nav { display: none !important; }
+        }
+
+        /* --- FRVP SETTINGS MODAL --- */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center; z-index: 5000;
+        }
+        .modal-content {
+            background: #1e222d; border-radius: 6px; width: 340px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid #363a45;
+            color: #d1d4dc; font-family: 'Inter', sans-serif; overflow: hidden;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 16px; border-bottom: 1px solid #363a45; font-weight: 600;
+        }
+        .modal-close { cursor: pointer; font-size: 20px; color: #787b86; }
+        .modal-tabs {
+            display: flex; border-bottom: 1px solid #363a45; padding: 0 16px;
+        }
+        .modal-tab {
+            padding: 10px 0; margin-right: 20px; font-size: 13px; font-weight: 600;
+            color: #787b86; cursor: pointer; position: relative;
+        }
+        .modal-tab.active { color: #d1d4dc; }
+        .modal-tab.active::after {
+            content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+            height: 2px; background: #2962ff;
+        }
+        .modal-body { padding: 20px 16px; }
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; font-size: 13px;
+        }
+        .settings-row label { color: #d1d4dc; }
+        .settings-row input[type="number"], .settings-row select {
+            background: #2a2e39; border: 1px solid #363a45; color: #d1d4dc;
+            padding: 4px 8px; border-radius: 4px; outline: none; width: 120px;
+        }
+        .settings-row input[type="checkbox"] { accent-color: #2962ff; width: 16px; height: 16px; }
+        .modal-footer {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px; border-top: 1px solid #363a45;
+        }
+        .template-select {
+            background: #2a2e39; border: 1px solid #363a45; color: #d1d4dc;
+            padding: 4px 8px; border-radius: 4px; font-size: 12px;
+        }
+        .modal-btn {
+            padding: 6px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+        }
+        .modal-btn.cancel { background: #363a45; color: #d1d4dc; }
+        .modal-btn.ok { background: #2962ff; color: #fff; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="toolset">
+            <div style="display:flex; align-items:center;">
+                <b>SYMBOL:</b>
+                <input type="text" id="symbol-input" class="atas-input" value="BTCUSDT" spellcheck="false">
+            </div>
+            <div style="display:flex; align-items:center;">
+                <b>TICK:</b>
+                <input type="text" id="tick-input" class="atas-input" value="5.0" style="width:65px; margin-right:5px;">
+                <button id="auto-tick-btn" class="draw-btn" style="width:24px; height:22px; font-size:10px; margin-right:5px;" title="Auto Tick">A</button>
+                <select id="density-select" class="atas-select"></select>
+            </div>
+            <div style="display:flex; align-items:center;">
+                <b>PERIOD:</b>
+                <select id="tf-select" class="atas-select" style="margin-right:15px;">
+                    <option value="1m">1m</option>
+                    <option value="5m">5m</option>
+                    <option value="15m">15m</option>
+                    <option value="1h">1h</option>
+                    <option value="2h">2h</option>
+                    <option value="4h">4h</option>
+                    <option value="1d">1d</option>
+                </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:5px;">
+                <button id="imb-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Diagonal Imbalance">IMB</button>
+                <button id="stk-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Stacked Imbalance">STK</button>
+                <button id="heat-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Liquidity Heatmap">HEAT</button>
+                <button id="delta-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Delta Histogram">DELTA</button>
+                <button id="whale-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Aggressive Whale Bubbles">WHALE</button>
+                <button id="glow-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Glowing DOM Walls">GLOW</button>
+                <button id="foot-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Bid/Ask Footprint">FOOT</button>
+                <button id="stats-table-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Bottom Stats Table">STATS</button>
+                <button id="chart-type-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px;" title="Candle/Line Toggle">CANDLE</button>
+                <button id="snr-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px;" title="SNR Levels">SNR</button>
+                <button id="sk-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#F59E0B; border-color:#F59E0B;" title="Advanced SK System">SK</button>
+                <button id="smc-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#00FFFF; border-color:#00FFFF;" title="Smart Money Concepts">SMC</button>
+                <button id="crt-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#FF00FF; border-color:#FF00FF;" title="CRT Entry Setup">CRT</button>
+                <button id="vwap-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px;" title="VWAP with Bands">VWAP</button>
+                <button id="vol-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px;" title="Volume Bars">VOL</button>
+                <button id="day-open-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#FFFFFF; border-color:#FFFFFF;" title="Daily Open Line">D-OPEN</button>
+                <button id="daily-tpo-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#8A2BE2; border-color:#8A2BE2;" title="Automatic Daily TPO">D-TPO</button>
+                <button id="daily-vp-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 6px; color:#2962FF; border-color:#2962FF;" title="Automatic Daily Volume Profile">D-VOL</button>
+                <button id="cvd-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 6px; color:#FFA500; border-color:#FFA500;" title="Cumulative Volume Delta">CVD</button>
+                <input type="text" id="whale-thres-input" class="atas-input" value="10.0" style="width:40px; font-size:9px;" title="Whale BTC Threshold">
+
+                <button id="jump-24h-btn" class="draw-btn" style="font-size:9px; width:auto; padding:0 12px; color:#00FFFF; border-color:#00FFFF; margin-left: 10px;" title="Jump 24H Back">24H BACK</button>
+                <button id="go-live-btn" class="draw-btn active" style="font-size:9px; width:auto; padding:0 12px; color:#10B981; border-color:#10B981;" title="Jump to Live">LIVE</button>
+            </div>
+            <div style="color:#FFF;">Market Research | <span style="color:#00FFFF;">Institutional TPO</span></div>
+        </div>
+        <div id="hdr-p" class="price-badge-live">00.00</div>
+        <button id="mobile-menu-btn" style="display:none;" onclick="openSheet('ind')">&#9776;</button>
+    </header>
+
+    <!-- Bottom Navigation Bar -->
+    <div id="bottom-nav">
+        <button class="bnav-btn active" id="bnav-chart" onclick="switchTab('chart')">
+            <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span class="bnav-label">CHART</span>
+        </button>
+        <button class="bnav-btn" id="bnav-ind" onclick="openSheet('ind')">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            <span class="bnav-label">TOOLS</span>
+        </button>
+        <button class="bnav-btn" id="bnav-tf" onclick="openSheet('tf')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="bnav-label">TF</span>
+        </button>
+        <button class="bnav-btn" id="bnav-sym" onclick="openSheet('sym')">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span class="bnav-label">SYMBOL</span>
+        </button>
+    </div>
+
+    <!-- Sheet Overlay -->
+    <div id="sheet-overlay" style="display:none;" onclick="closeSheet()"></div>
+
+    <!-- Bottom Sheet -->
+    <div id="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title" id="sheet-title">INDICATORS</div>
+        <div class="sheet-content">
+
+            <!-- INDICATORS TAB -->
+            <div id="tab-ind">
+                <div class="sheet-section-title">Order Flow</div>
+                <div class="sheet-grid">
+                    <div class="sheet-toggle on" id="st-imb" onclick="sheetToggle('showImb','imb-btn',this)"><span class="st-icon">⚡</span>IMB</div>
+                    <div class="sheet-toggle on" id="st-stk" onclick="sheetToggle('showStk','stk-btn',this)"><span class="st-icon">🔗</span>STACKED</div>
+                    <div class="sheet-toggle on" id="st-heat" onclick="sheetToggle('showHeat','heat-btn',this)"><span class="st-icon">🌡️</span>HEAT</div>
+                    <div class="sheet-toggle on" id="st-delta" onclick="sheetToggle('showDelta','delta-btn',this)"><span class="st-icon">Δ</span>DELTA</div>
+                    <div class="sheet-toggle on" id="st-whale" onclick="sheetToggle('showWhale','whale-btn',this)"><span class="st-icon">🐋</span>WHALE</div>
+                    <div class="sheet-toggle on" id="st-glow" onclick="sheetToggle('showGlowWalls','glow-btn',this)"><span class="st-icon">✨</span>GLOW</div>
+                    <div class="sheet-toggle on" id="st-foot" onclick="sheetToggle('showFootprint','foot-btn',this)"><span class="st-icon">📊</span>FOOT</div>
+                    <div class="sheet-toggle on" id="st-stats" onclick="sheetToggle('showStatsTable','stats-table-btn',this)"><span class="st-icon">📑</span>STATS</div>
+                    <div class="sheet-toggle" id="st-chart" onclick="toggleChartType(this)"><span class="st-icon">📈</span>LINE</div>
+                    <div class="sheet-toggle" id="st-snr" onclick="sheetToggle('showSNR','snr-btn',this)"><span class="st-icon">🎯</span>SNR</div>
+                    <div class="sheet-toggle" id="st-sk" onclick="sheetToggle('showSK','sk-btn',this)"><span class="st-icon">📐</span>SK SYSTEM</div>
+                    <div class="sheet-toggle" id="st-smc" onclick="sheetToggle('showSMC','smc-btn',this)"><span class="st-icon">🏦</span>SMC SYSTEM</div>
+                    <div class="sheet-toggle" id="st-crt" onclick="sheetToggle('showCRT','crt-btn',this)"><span class="st-icon">🎯</span>CRT SETUP</div>
+                    <div class="sheet-toggle on" id="st-vwap" onclick="sheetToggle('showVWAP','vwap-btn',this)"><span class="st-icon">📈</span>VWAP</div>
+                    <div class="sheet-toggle on" id="st-vol" onclick="sheetToggle('showVol','vol-btn',this)"><span class="st-icon">📊</span>VOLUME</div>
+                    <div class="sheet-toggle on" id="st-cvd" onclick="sheetToggle('showCVD','cvd-btn',this)"><span class="st-icon">Δ∑</span>CVD</div>
+                    <div class="sheet-toggle" id="st-dopen" onclick="sheetToggle('showDayOpen','day-open-btn',this)"><span class="st-icon">⚪</span>D-OPEN</div>
+                    <div class="sheet-toggle" id="st-dtpo" onclick="sheetToggle('showDailyTPO','daily-tpo-btn',this)"><span class="st-icon">📊</span>D-TPO</div>
+                    <div class="sheet-toggle" id="st-dvp" onclick="sheetToggle('showDailyVP','daily-vp-btn',this)"><span class="st-icon">📊</span>D-VOL</div>
+                    <div class="sheet-toggle on" id="st-draw" onclick="toggleDrawTools(this)"><span class="st-icon">✎</span>DRAW TOOLS</div>
+                </div>
+
+                <div class="sheet-section-title">Drawing Tools</div>
+                <div class="sheet-grid">
+                    <div class="sheet-toggle" onclick="setMobileTool('cursor', this)"><span class="st-icon">↖</span>CURSOR</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('hline', this)"><span class="st-icon">⎯</span>H-LINE</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('line', this)"><span class="st-icon">╱</span>TREND</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('box', this)"><span class="st-icon">⃞</span>BOX</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('long', this)"><span class="st-icon">📈</span>LONG</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('short', this)"><span class="st-icon">📉</span>SHORT</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('delta-prof', this)"><span class="st-icon">ΔP</span>DELTA P</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('vol-prof', this)"><span class="st-icon">📊</span>VOL P</div>
+                    <div class="sheet-toggle" onclick="setMobileTool('tpo', this)"><span class="st-icon">TPO</span>TPO</div>
+                    <div class="sheet-toggle" onclick="drawings.pop(); closeSheet();" style="color:#F59E0B;"><span class="st-icon">⟲</span>UNDO</div>
+                    <div class="sheet-toggle" onclick="drawings = []; closeSheet();" style="color:#EF4444;"><span class="st-icon">🗑️</span>CLEAR</div>
+                </div>
+
+            </div>
+
+            <!-- TF TAB -->
+            <div id="tab-tf" style="display:none;">
+                <div class="sheet-section-title">Timeframe</div>
+                <div class="sheet-tf-row">
+                    <div class="sheet-tf-btn" onclick="setMobileTF('1m',this)">1m</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('5m',this)">5m</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('15m',this)">15m</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('1h',this)">1h</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('2h',this)">2h</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('4h',this)">4h</div>
+                    <div class="sheet-tf-btn" onclick="setMobileTF('1d',this)">1d</div>
+                </div>
+            </div>
+
+            <!-- SYMBOL TAB -->
+            <div id="tab-sym" style="display:none;">
+                <div class="sheet-section-title">Symbol</div>
+                <div class="sheet-sym-row">
+                    <input class="sheet-sym-input" id="mobile-sym-input" placeholder="e.g. BTCUSDT" spellcheck="false">
+                    <button class="sheet-sym-go" onclick="changeMobileSymbol()">GO</button>
+                </div>
+                <div class="sheet-section-title" style="margin-top:18px;">Quick Select</div>
+                <div class="sheet-tf-row">
+                    <div class="sheet-tf-btn" onclick="quickSym('BTCUSDT')">BTC</div>
+                    <div class="sheet-tf-btn" onclick="quickSym('ETHUSDT')">ETH</div>
+                    <div class="sheet-tf-btn" onclick="quickSym('SOLUSDT')">SOL</div>
+                    <div class="sheet-tf-btn" onclick="quickSym('XRPUSDT')">XRP</div>
+                    <div class="sheet-tf-btn" onclick="quickSym('BNBUSDT')">BNB</div>
+                    <div class="sheet-tf-btn" onclick="quickSym('DOGEUSDT')">DOGE</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <main>
+        <div id="viewport">
+            <div id="drawing-toolbar">
+                <button class="draw-btn active" id="tool-cursor" title="Cursor">↖</button>
+                <button class="draw-btn" id="tool-hline" title="Horizontal Line">⎯</button>
+                <button class="draw-btn" id="tool-line" title="Trend Line">╱</button>
+                <button class="draw-btn" id="tool-box" title="Box Area">⃞</button>
+                <button class="draw-btn" id="tool-long" title="Long Position">L</button>
+                <button class="draw-btn" id="tool-short" title="Short Position">S</button>
+                <button class="draw-btn" id="tool-delta-prof" title="Fixed Range Delta Profile">ΔP</button>
+                <button class="draw-btn" id="tool-vol-prof" title="Fixed Range Volume Profile">VP</button>
+                <button class="draw-btn" id="tool-tpo" title="Fixed Range TPO Profile">TPO</button>
+                <button class="draw-btn" id="tool-undo" title="Undo (Ctrl+Z)" style="margin-top:10px; color:#F59E0B; border-color:#F59E0B;">⟲</button>
+                <button class="draw-btn" id="tool-clear" title="Clear All" style="color:#EF4444; border-color:#EF4444;">🗑️</button>
+            </div>
+            <div id="drawing-settings" style="position:absolute; display:none; gap:12px; background:rgba(18, 24, 34, 0.95); border:1px solid rgba(255,255,255,0.15); padding:8px 12px; border-radius:12px; z-index:1000; box-shadow: 0 10px 30px rgba(0,0,0,0.7); backdrop-filter: blur(16px); align-items: center; pointer-events: none;">
+                <div id="drag-handle" style="cursor:move; background:#2962FF; color:#FFF; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; font-size:14px; pointer-events: auto; transition: 0.2s; border: 1px solid rgba(255,255,255,0.1);" title="Drag Toolbar">⠿</div>
+                <div style="display:flex; align-items:center; gap:8px; pointer-events: auto;">
+                    <input type="color" id="drawing-color-input" style="width:28px; height:28px; padding:0; border:1px solid rgba(255,255,255,0.2); background:none; border-radius:6px; cursor:pointer;" title="Change Color">
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <span style="font-size:8px; font-weight:bold; color:#94A3B8;">OPACITY</span>
+                        <input type="range" id="drawing-opacity-input" min="0" max="1" step="0.05" style="width:60px; height:4px; appearance:none; background:#374151; border-radius:2px; cursor:pointer; outline:none;">
+                    </div>
+                </div>
+                <div style="width:1px; height:20px; background:rgba(255,255,255,0.1);"></div>
+                <div style="width:1px; height:20px; background:rgba(255,255,255,0.1);"></div>
+                <button id="settings-drawing-btn" style="background:#4B5563; color:#FFF; border:none; width:28px; height:28px; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events: auto; transition: 0.2s; border: 1px solid rgba(255, 255, 255, 0.1);" title="Settings">⚙️</button>
+                <button id="del-drawing-btn" style="background:#EF4444; color:#FFF; border:none; width:28px; height:28px; cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; pointer-events: auto; transition: 0.2s; border: 1px solid rgba(239, 68, 68, 0.2);" title="Delete Selected Object">🗑️</button>
+            </div>
+            <div class="status-ohlc" id="ohlc-info">Calibrating Market...</div>
+            <div id="loader">ULTRA PRECISION ENGINE...</div>
+            <div style="flex:1; position:relative; min-height:0;"><canvas id="main-c"></canvas></div>
+            <div id="stats-panel-wrap"><canvas id="stats-c"></canvas></div>
+            <div id="tf-heatmap-hud"></div>
+            <div id="bottom-axis"><canvas id="time-c"></canvas></div>
+        </div>
+        <div id="scale-right">
+            <canvas id="scale-c"></canvas>
+            <div id="price-badge">0.00</div>
+        </div>
+    </main>
+
+    <!-- FRVP SETTINGS MODAL -->
+    <div id="frvp-settings-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>FRVP</span>
+                <span class="modal-close" onclick="closeFrvpSettings()">&times;</span>
+            </div>
+            <div class="modal-tabs">
+                <div class="modal-tab active">Inputs</div>
+                <div class="modal-tab">Style</div>
+                <div class="modal-tab">Coordinates</div>
+                <div class="modal-tab">Visibility</div>
+            </div>
+            <div class="modal-body">
+                <div class="settings-row">
+                    <label>Rows Layout</label>
+                    <select id="frvp-rows-layout">
+                        <option value="number">Number of Rows</option>
+                        <option value="ticks">Ticks per Row</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>Row Size</label>
+                    <input type="number" id="frvp-row-size" value="150">
+                </div>
+                <div class="settings-row">
+                    <label>Volume</label>
+                    <select id="frvp-volume-mode">
+                        <option value="total">Total</option>
+                        <option value="updown">Up/Down</option>
+                    </select>
+                </div>
+                <div class="settings-row">
+                    <label>Value Area Volume</label>
+                    <input type="number" id="frvp-va-volume" value="70">
+                </div>
+                <div class="settings-row">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="frvp-extend-right"> Extend Right
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <select class="template-select"><option>Template</option></select>
+                <div style="display:flex; gap:10px;">
+                    <button class="modal-btn cancel" onclick="closeFrvpSettings()">Cancel</button>
+                    <button class="modal-btn ok" onclick="saveFrvpSettings()">Ok</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SETTINGS = { symbol:'BTCUSDT', tick:5.0, autoTick:true, rowH:26, pxMin:120, profW:160, domW:180, period:1800000, tf:'1m', tfMs:60000, resTol:1.0, resThres:0.75, showImb:true, showDelta:true, showWhale:true, showGlowWalls:true, showHeat:true, showStk:true, showStatsTable:true, showDrawTools: true, showOI:true, showCVD:true, showDOI:true, showLiq:true, showTrend:true, showTIndex:true, showTFHeatmap:true, showFootprint:true, chartType: 'candle', showSNR: false, showSK: false, showSMC: false, showCRT: false, showVWAP: false, showVol: true, showDayOpen: false, showDailyTPO: false, showDailyVP: false, whaleThres: 10.0, stackedZones: [], heatMap: [] };
+        const THEME = { bg:'#070B14', grid:'#101721', vBase:'41, 108, 255', poc:'rgba(41, 138, 255, 0.4)', up:'#10B981', dn:'#EF4444', cyn:'#00FFFF', tpo:'#8A2BE2', hvY:'rgba(255, 235, 59, 0.35)', hvR:'rgba(239, 68, 68, 0.35)', drawings: '#8A2BE2', resZone: 'rgba(138, 43, 226, 0.15)', imbU: '#FFD700', imbD: '#FF4500', heatUp: 'rgba(16, 185, 129, 0.05)', heatDn: 'rgba(239, 68, 68, 0.05)', oi: '#00FFFF', cvd: '#FFA500', doiUp: '#10B981', doiDn: '#EF4444', liq: '#FF00FF', vwap: '#FFEA00', vwapBand: 'rgba(255, 234, 0, 0.15)', sk: '#F59E0B', smc: '#00FFFF', crt: '#FF00FF' };
+        
+        let DEFAULT_FRVP_SETTINGS = {
+            rowsLayout: 'number',
+            rowSize: 150,
+            volumeMode: 'total',
+            vaVolume: 70,
+            extendRight: false
+        };
+        
+        let dpr = window.devicePixelRatio || 1;
+        const STATES = {};
+
+        function initState(sym) {
+            if (!STATES[sym]) {
+                STATES[sym] = {
+                    bars: [], profile: { v: {}, max: 0, poc: 0 }, tradeCache: [], oiCache: [], vSpdCache: [],
+                    orderBook: { b: {}, a: {}, rawB: {}, rawA: {}, max: 0 },
+                    lastP: 0, scrollY: 0, scrollX: 0, zoomX: 1, zoomY: 0.8, lastTotalV: 0,
+                    ws: null, wsDOM: null, heatMap: [], reconnectTimer: null, tf: '', tfBars: {}, baseTick: null
+                };
+            }
+            return STATES[sym];
+        }
+
+        function recalcProfile(sym) {
+            const state = STATES[sym];
+            if(!state) return;
+            state.profile = { v: {}, max: 0, poc: 0 };
+            state.bars.forEach(b => {
+                Object.keys(b.vAP).forEach(p => {
+                    const v = b.vAP[p].t;
+                    state.profile.v[p] = (state.profile.v[p] || 0) + v;
+                    if(state.profile.v[p] > state.profile.max) { 
+                        state.profile.max = state.profile.v[p]; 
+                        state.profile.poc = +p; 
+                    }
+                });
+            });
+        }
+
+
+        let mouseX = 0, mouseY = 0;
+        let drawings = [], activeTool = 'cursor', isDrawing = false, startP, startT;
+        
+        const mainC = document.getElementById('main-c'), scaleC = document.getElementById('scale-c'), timeC = document.getElementById('time-c'), statsC = document.getElementById('stats-c');
+        const ctx = mainC.getContext('2d'), sctx = scaleC.getContext('2d'), tctx = timeC.getContext('2d'), stctx = statsC.getContext('2d');
+        let w, h, sw, sh, tw, th, stw, sth;
+
+        async function init(newSymbol = SETTINGS.symbol, newTick = null) {
+            const sym = newSymbol.toUpperCase();
+            SETTINGS.symbol = sym;
+            let state = STATES[sym];
+            if (!state) { state = initState(sym); STATES[sym] = state; }
+            
+            if(newTick === null) {
+                if(SETTINGS.symbol.includes('BTC')) { SETTINGS.tick = 5.0; SETTINGS.whaleThres = 25.0; }
+                else if(SETTINGS.symbol.includes('ETH')) { SETTINGS.tick = 0.5; SETTINGS.whaleThres = 200.0; }
+                else if(SETTINGS.symbol.includes('XRP') || SETTINGS.symbol.includes('PEPE')) { SETTINGS.tick = 0.001; SETTINGS.whaleThres = 500000.0; }
+                else { SETTINGS.tick = 0.01; SETTINGS.whaleThres = 10000.0; }
+                document.getElementById('whale-thres-input').value = SETTINGS.whaleThres;
+            } else {
+                SETTINGS.tick = parseFloat(newTick);
+            }
+            
+            document.getElementById('symbol-input').value = SETTINGS.symbol;
+            document.getElementById('tick-input').value = SETTINGS.tick;
+            document.getElementById('tf-select').value = SETTINGS.tf;
+
+            window.addEventListener('resize', resize); resize();
+            setTimeout(resize, 100); // Secondary resize to ensure correct dimensions
+            updatePresets(SETTINGS.symbol);
+
+            let isNewSymbol = false;
+            if (state.baseTick === null) isNewSymbol = true;
+
+            if (state.baseTick !== SETTINGS.tick) {
+                // Tick density changed! We MUST clear cached aggregations to avoid overlaps.
+                state.tfBars = {};
+                state.bars = [];
+                state.baseTick = SETTINGS.tick;
+            }
+
+            if (!state.tfBars) state.tfBars = {};
+            
+            if (state.bars.length === 0 || state.tf !== SETTINGS.tf) {
+                state.tf = SETTINGS.tf;
+                document.getElementById('loader').style.display='flex';
+
+                if (SETTINGS.tf === '1m') state.zoomY = 0.8;
+                else if (SETTINGS.tf === '5m') state.zoomY = 1.8;
+                else state.zoomY = 2.5;
+                
+                // Step 1: Load raw data with a temp tick first (only for auto-tick calculation)
+                if (SETTINGS.autoTick && isNewSymbol) {
+                    // Load with default tick to get OHLC data for auto-tick calculation
+                    await loadHistory(sym);
+                    // Now calculate the correct tick based on actual price ranges
+                    const prevTick = SETTINGS.tick;
+                    calculateAutoTick(sym);
+                    // If tick changed, we MUST reload with the correct tick applied to ALL bars
+                    if (SETTINGS.tick !== prevTick) {
+                        state.tfBars = {}; // clear all cached aggregations
+                        state.bars = [];
+                        state.baseTick = SETTINGS.tick;
+                        await loadHistory(sym); // reload with correct tick for ALL candles
+                    } else {
+                        state.baseTick = SETTINGS.tick;
+                    }
+                } else if (state.tfBars[state.tf] && state.tfBars[state.tf].length > 0) {
+                    state.bars = state.tfBars[state.tf];
+                    recalcProfile(sym);
+                } else {
+                    await loadHistory(sym);
+                }
+                
+                if (!state.ws || state.ws.readyState === WebSocket.CLOSED) {
+                    await fetchSnapshot(sym); 
+                    connectLive(sym);
+                }
+                document.getElementById('loader').style.display='none';
+            }
+
+            // Memory GC deliberately removed
+            // The background engine is fully optimized to handle massive amounts of coins without slowing down
+            // When returning to BTC or any coin, data stays instantly ready!
+
+            if (!window.loopStarted) { window.loopStarted = true; loop(); }
+        }
+
+        function calculateAutoTick(sym) {
+            const state = STATES[sym];
+            if(!state || !state.bars.length) return;
+            const lastN = state.bars.slice(-20);
+            let avgRange = 0;
+            lastN.forEach(b => avgRange += (b.h - b.l));
+            avgRange /= lastN.length;
+            if(!avgRange) return;
+
+            const tfMap = { '1m': 2.0, '5m': 4.5, '15m': 8.0, '1h': 15.0, '2h': 25.0, '4h': 40.0, '1d': 80.0 };
+            const divisor = tfMap[SETTINGS.tf] || 2.0;
+            const rawTick = avgRange / divisor; 
+
+            const cleanTicks = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 2.5, 5.0, 10.0, 12.5, 20.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0];
+            let bestTick = cleanTicks[0];
+            let minDist = Math.abs(rawTick - bestTick);
+            for(let t of cleanTicks) {
+                let d = Math.abs(rawTick - t);
+                if(d < minDist) { minDist = d; bestTick = t; }
+            }
+            SETTINGS.tick = bestTick;
+            document.getElementById('tick-input').value = SETTINGS.tick;
+            document.getElementById('auto-tick-btn').classList.add('active');
+        }
+
+        async function fetchSnapshot(sym) {
+            try {
+                const state = STATES[sym];
+                const res = await fetch(`https://fapi.binance.com/fapi/v1/depth?symbol=${sym}&limit=1000`);
+                const data = await res.json();
+                state.orderBook.rawB = {}; state.orderBook.rawA = {};
+                data.bids.forEach(b => { state.orderBook.rawB[+b[0]] = +b[1]; });
+                data.asks.forEach(a => { state.orderBook.rawA[+a[0]] = +a[1]; });
+                processOrderBook(sym);
+            } catch(e) { console.error("Snapshot fetch failed", e); }
+        }
+
+        function processOrderBook(sym) {
+            const state = STATES[sym];
+            if (!state) return;
+            state.orderBook.b = {}; state.orderBook.a = {};
+            let m = 0;
+            Object.keys(state.orderBook.rawB).forEach(p => { 
+                const tp = Math.round(p/SETTINGS.tick)*SETTINGS.tick; 
+                state.orderBook.b[tp] = (state.orderBook.b[tp]||0) + state.orderBook.rawB[p]; 
+                if(state.orderBook.b[tp] > m) m = state.orderBook.b[tp];
+            });
+            Object.keys(state.orderBook.rawA).forEach(p => { 
+                const tp = Math.round(p/SETTINGS.tick)*SETTINGS.tick; 
+                state.orderBook.a[tp] = (state.orderBook.a[tp]||0) + state.orderBook.rawA[p]; 
+                if(state.orderBook.a[tp] > m) m = state.orderBook.a[tp];
+            });
+            state.orderBook.max = m;
+            
+            if (SETTINGS.showHeat) {
+                const now = Date.now();
+                if (!state.lastSnapshot || now - state.lastSnapshot > 5000) {
+                    state.heatMap.push({ t: now, b: { ...state.orderBook.b }, a: { ...state.orderBook.a } });
+                    if (state.heatMap.length > 300) state.heatMap.shift();
+                    state.lastSnapshot = now;
+                }
+            }
+        }
+
+        function updatePresets(sym) {
+            const select = document.getElementById('density-select');
+            select.innerHTML = '<option value="">-- AGGREGATION --</option>';
+            let opts = [];
+            const p = STATES[sym] ? STATES[sym].lastP : 0;
+            
+            if(sym.includes('BTC')) opts = [{l:'X1(5.0)',v:5.0}, {l:'X2(10.0)',v:10.0}, {l:'X5(25.0)',v:25.0}, {l:'X10(50.0)',v:50.0}];
+            else if(sym.includes('ETH')) opts = [{l:'X1(0.5)',v:0.5}, {l:'X2(1.0)',v:1.0}, {l:'X4(2.0)',v:2.0}, {l:'X10(5.0)',v:5.0}];
+            else if(p > 100) opts = [{l:'X1(0.1)',v:0.1}, {l:'X2(0.2)',v:0.2}, {l:'X5(0.5)',v:0.5}];
+            else if(p > 1) opts = [
+                {l:'X1(0.001)',v:0.001}, {l:'X2(0.002)',v:0.002}, {l:'X5(0.005)',v:0.005}, 
+                {l:'X10(0.01)',v:0.01}, {l:'X20(0.02)',v:0.02}, {l:'X50(0.05)',v:0.05}, {l:'X100(0.1)',v:0.1}
+            ];
+            else if(p > 0.01) opts = [{l:'X1(0.001)',v:0.001}, {l:'X5(0.005)',v:0.005}, {l:'X10(0.01)',v:0.01}];
+            else opts = [{l:'X1(0.0001)',v:0.0001}, {l:'X10(0.001)',v:0.001}];
+            
+            opts.forEach(o => {
+                const opt = document.createElement('option'); opt.value = o.v; opt.textContent = o.l; select.appendChild(opt);
+            });
+        }
+
+        function resize() {
+            w = mainC.width = mainC.parentElement.clientWidth * dpr; h = mainC.height = mainC.parentElement.clientHeight * dpr;
+            sw = scaleC.width = scaleC.parentElement.clientWidth * dpr; sh = scaleC.height = scaleC.parentElement.clientHeight * dpr;
+            tw = timeC.width = timeC.parentElement.clientWidth * dpr; th = timeC.height = timeC.parentElement.clientHeight * dpr;
+            stw = statsC.width = statsC.parentElement.clientWidth * dpr; sth = statsC.height = statsC.parentElement.clientHeight * dpr;
+            
+            // Set transforms for high-DPI
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            stctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        async function loadHistory(sym) {
+            const state = STATES[sym];
+            state.bars = []; state.profile = { v: {}, max: 0, poc: 0 };
+            if (!state.tfBars) state.tfBars = {};
+
+            const tfs = ['1m', '5m', '15m', '1h', '2h', '4h', '1d'];
+            for (const tf of tfs) {
+                if (!state.tfBars[tf] || state.tfBars[tf].length < 1000) {
+                    try {
+                        const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${tf}&limit=1500`);
+                        const data = await res.json();
+                        state.tfBars[tf] = data.map(k => {
+                            const vol = +k[5], buys = +k[9], sells = vol - buys;
+                            const o = +k[1], h = +k[2], l = +k[3], c = +k[4];
+                            
+                            const vAP = {};
+                            let maxVol = 0;
+                            let pocPrice = c;
+                            
+                            const tick = SETTINGS.tick;
+                            const startP = Math.round(l / tick) * tick;
+                            const endP = Math.round(h / tick) * tick;
+                            const typP = Math.round(((h + l + c) / 3) / tick) * tick;
+                            
+                            const totalTicks = Math.round((endP - startP) / tick) + 1;
+                            
+                            if (totalTicks <= 1 || isNaN(totalTicks)) {
+                                vAP[startP] = { t: vol, b: buys, s: sells };
+                                maxVol = vol;
+                                pocPrice = startP;
+                            } else {
+                                let sumWeight = 0;
+                                const weights = {};
+                                for (let p = startP; p <= endP; p += tick) {
+                                    const pLevel = Math.round(p / tick) * tick;
+                                    const dist = Math.abs(pLevel - typP) / tick;
+                                    const weight = Math.exp(-(dist * dist) / Math.max(1, totalTicks * 0.4));
+                                    weights[pLevel] = weight;
+                                    sumWeight += weight;
+                                }
+                                
+                                for (let pStr in weights) {
+                                    const pLevel = +pStr;
+                                    const w = weights[pStr] / sumWeight;
+                                    const cVol = vol * w;
+                                    const cBuys = buys * w;
+                                    const cSells = sells * w;
+                                    vAP[pLevel] = { t: cVol, b: cBuys, s: cSells };
+                                    if (cVol > maxVol) {
+                                        maxVol = cVol;
+                                        pocPrice = pLevel;
+                                    }
+                                }
+                            }
+
+                            return {
+                                t:+k[0], o:o, h:h, l:l, c:c, v:vol, vAP:vAP, max:maxVol, p:pocPrice, buys:buys, sells:sells, whales:[], oi:0, liqs:[]
+                            };
+                        });
+                    } catch(e) { console.error(`Failed to load ${tf} history`, e); }
+                }
+            }
+            
+            state.bars = state.tfBars[SETTINGS.tf] || [];
+            
+            // Restore OI from local cache if we polled it previously
+            if (state.oiCache.length > 0) {
+                state.bars.forEach(b => {
+                    const matchedOI = state.oiCache.find(o => o.t >= b.t && o.t < b.t + SETTINGS.tfMs);
+                    if (matchedOI) b.oi = matchedOI.oi;
+                });
+            }
+            
+            applyCache(sym);
+            if (state.bars.length) {
+                state.lastP = state.bars[state.bars.length-1].c; 
+                state.scrollY = state.lastP; 
+                state.scrollX = 0;
+                // On mobile use smaller zoomX so 20+ bars are visible
+                state.zoomX = window.innerWidth < 768 ? 0.22 : 1.0;
+                // Mobile: set zoomY so row height fits nicely
+                if (window.innerWidth < 768) state.zoomY = 0.6;
+            }
+        }
+
+        function applyCache(sym) {
+            const state = STATES[sym];
+            if(!state.bars.length || !state.tradeCache.length) return;
+            const start = state.bars[0].t, end = state.bars[state.bars.length-1].t + SETTINGS.tfMs;
+            state.tradeCache.forEach(tr => {
+                if(tr.t < start || tr.t >= end) return;
+                const bT = Math.floor(tr.t / SETTINGS.tfMs) * SETTINGS.tfMs;
+                const b = state.bars.find(x => x.t === bT);
+                if(b) {
+                    const tp = Math.round(tr.p / SETTINGS.tick) * SETTINGS.tick;
+                    b.v += tr.q;
+                    if(typeof b.vAP[tp] !== 'object') b.vAP[tp] = { b:0, s:0, t:0 };
+                    
+                    b.vAP[tp].t += tr.q;
+                    if (tr.isSell !== undefined) {
+                        if(tr.isSell) { b.vAP[tp].s += tr.q; b.sells += tr.q; }
+                        else { b.vAP[tp].b += tr.q; b.buys += tr.q; }
+                    }
+                    
+                    if(b.vAP[tp].t > b.max) { b.max = b.vAP[tp].t; b.p = tp; }
+                    state.profile.v[tp] = (state.profile.v[tp] || 0) + tr.q;
+                    if(state.profile.v[tp] > state.profile.max) { state.profile.max = state.profile.v[tp]; state.profile.poc = tp; }
+                }
+            });
+        }
+
+        async function connectLive(sym) {
+            const state = STATES[sym];
+            if (state.ws) state.ws.close();
+            if (state.wsDOM) state.wsDOM.close();
+            const wsSym = sym.toLowerCase();
+
+            // Split connections to preserve original DOM speed and depth
+            state.ws = new WebSocket(`wss://fstream.binance.com/market/stream?streams=${wsSym}@aggTrade/!forceOrder@arr`);
+            state.wsDOM = new WebSocket(`wss://fstream.binance.com/stream?streams=${wsSym}@depth@100ms`);
+            
+            const handleMsg = e => {
+                const msg = JSON.parse(e.data);
+                const stream = msg.stream;
+                const streamSym = stream.includes('forceOrder') ? msg.data.o.s.toUpperCase() : stream.split('@')[0].toUpperCase();
+                const s = STATES[streamSym];
+                if (!s) return;
+
+                if (window.innerWidth < 768) {
+                    if (!s._msgQueue) s._msgQueue = [];
+                    s._msgQueue.push(msg);
+                    if (s._msgQueue.length > 200) s._msgQueue.shift(); 
+                    return; 
+                }
+                processWSMessage(msg);
+            };
+
+            state.ws.onmessage = handleMsg;
+            state.wsDOM.onmessage = handleMsg;
+
+            const handleClose = () => { if (!state.reconnectTimer) { console.log(`WS Closed for ${sym}. Retrying...`); scheduleReconnect(sym); } };
+            state.ws.onclose = handleClose;
+            state.wsDOM.onclose = handleClose;
+            
+            state.ws.onerror = () => { if(state.ws) state.ws.close(); };
+            state.wsDOM.onerror = () => { if(state.wsDOM) state.wsDOM.close(); };
+        }
+
+        // --- WebSocket Processing Engine (Global Scope) ---
+        function processWSMessage(msg) {
+            const stream = msg.stream;
+            const d = msg.data;
+            const streamSym = stream.includes('forceOrder') ? d.o.s.toUpperCase() : stream.split('@')[0].toUpperCase();
+            const s = STATES[streamSym];
+            if (!s) return;
+            const now = Date.now();
+            const isMobile = window.innerWidth < 768;
+
+            if (stream.includes('@aggTrade')) {
+                const p = +d.p, q = +d.q, T = d.T, tp = Math.round(p/SETTINGS.tick)*SETTINGS.tick;
+                const isSell = d.m; 
+                
+                s.tradeCache.push({ p, q, t: T, isSell });
+                const maxCache = isMobile ? 5000 : 20000;
+                if(s.tradeCache.length > maxCache) s.tradeCache.shift();
+                
+                // Throttled UI updates
+                if (streamSym === SETTINGS.symbol && (!s.lastUIUpdate || now - s.lastUIUpdate > 300)) {
+                    const hp = document.getElementById('hdr-p'); 
+                    if (hp) {
+                        hp.innerText = p.toFixed(SETTINGS.tick < 0.01 ? 4 : 2); 
+                        hp.className=`price-badge-live ${p>=s.lastP?'up':'dn'}`;
+                    }
+                    s.lastUIUpdate = now;
+                }
+                s.lastP = p;
+
+                const tfMsMap = { '1m': 60000, '5m': 300000, '15m': 900000, '1h': 3600000, '2h': 7200000, '4h': 14400000, '1d': 86400000 };
+                if (!s.tfBars) s.tfBars = {};
+                if (!s.tfBars[s.tf] && s.bars.length) s.tfBars[s.tf] = s.bars;
+
+                const tfsToUpdate = isMobile ? [...new Set([s.tf, '1m'])] : Object.keys(s.tfBars);
+                tfsToUpdate.forEach(tfKey => {
+                    const tBars = s.tfBars[tfKey];
+                    if (!tBars) return;
+                    const bMs = tfMsMap[tfKey] || 60000;
+                    const barT = Math.floor(T / bMs) * bMs;
+                    
+                    let b = tBars[tBars.length-1];
+                    if (!b || b.t !== barT) {
+                        for (let idx = tBars.length - 2; idx >= Math.max(0, tBars.length - 10); idx--) {
+                            if (tBars[idx].t === barT) { b = tBars[idx]; break; }
+                        }
+                        if (!b || b.t !== barT) {
+                            b = { t:barT, o:p, h:p, l:p, c:p, v:0, vAP:{}, max:0, p:tp, buys:0, sells:0, whales:[], oi: tBars[tBars.length-1]?.oi||0, liqs:[] };
+                            tBars.push(b); 
+                            const maxBars = isMobile ? 200 : 1000;
+                            if (tBars.length > maxBars) tBars.shift();
+                        }
+                    }
+                    
+                    b.c=p; b.h=Math.max(b.h,p); b.l=Math.min(b.l,p); b.v+=q;
+                    if(isSell) b.sells += q; else b.buys += q;
+                    
+                    if(!b.vAP[tp]) b.vAP[tp] = { b:0, s:0, t:0 };
+                    if(isSell) b.vAP[tp].s += q; else b.vAP[tp].b += q;
+                    b.vAP[tp].t += q;
+
+                    if (q > SETTINGS.whaleThres) b.whales.push({ p, q, s:isSell });
+                    if(b.vAP[tp].t > b.max){ b.max=b.vAP[tp].t; b.p=tp; }
+                    
+                    if (tfKey === s.tf) {
+                        s.profile.v[tp] = (s.profile.v[tp]||0)+q;
+                        if(s.profile.v[tp]>s.profile.max) { s.profile.max=s.profile.v[tp]; s.profile.poc=tp; }
+                        
+                        if (streamSym === SETTINGS.symbol && (!s.lastOHLCUpdate || now - s.lastOHLCUpdate > 500)) {
+                            const ohlc = document.getElementById('ohlc-info');
+                            if (ohlc) ohlc.innerText = `${new Date(b.t).toLocaleTimeString()} O:${b.o} H:${b.h} L:${b.l} C:${b.c} V:${b.v.toFixed(0)} Δ:${(b.buys-b.sells).toFixed(0)}`;
+                            s.lastOHLCUpdate = now;
+                        }
+                    }
+                });
+            } 
+            else if (stream.includes('@forceOrder')) {
+                const o = d.o;
+                const lSym = o.s.toUpperCase();
+                const targetState = STATES[lSym];
+                if (targetState && targetState.bars.length) {
+                    const b = targetState.bars[targetState.bars.length-1];
+                    b.liqs.push({ p:+o.p, q:+o.q, s:o.S });
+                }
+            }
+            else if (stream.includes('@depth')) {
+                d.b.forEach(b => { if (+b[1] === 0) delete s.orderBook.rawB[+b[0]]; else s.orderBook.rawB[+b[0]] = +b[1]; });
+                d.a.forEach(a => { if (+a[1] === 0) delete s.orderBook.rawA[+a[0]]; else s.orderBook.rawA[+a[0]] = +a[1]; });
+                processOrderBook(streamSym);
+            }
+        }
+
+        // Mobile Batch Processor (Global Scope)
+        setInterval(() => {
+            if (window.innerWidth >= 768) return;
+            Object.keys(STATES).forEach(sym => {
+                const s = STATES[sym];
+                if (s._msgQueue && s._msgQueue.length > 0) {
+                    const batch = s._msgQueue.splice(0, s._msgQueue.length);
+                    batch.forEach(msg => processWSMessage(msg));
+                }
+            });
+        }, 150);
+
+        function scheduleReconnect(sym) {
+            const state = STATES[sym];
+            if (!state || state.reconnectTimer) return;
+            state.reconnectTimer = setTimeout(async () => {
+                state.reconnectTimer = null;
+                await fetchSnapshot(sym);
+                connectLive(sym);
+            }, 3000);
+        }
+
+        // --- Background Sync & Wake System ---
+        let lastVisible = Date.now();
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+                const now = Date.now();
+                console.log("Tab focused. Awake after", (now - lastVisible) / 1000, "s");
+                // If away for more than 10 seconds, re-fetch snapshot to be safe
+                if (now - lastVisible > 10000) {
+                    const sym = SETTINGS.symbol;
+                    const state = STATES[sym];
+                    await fetchSnapshot(sym);
+                    if (!state || !state.ws || state.ws.readyState !== WebSocket.OPEN || (state.wsDOM && state.wsDOM.readyState !== WebSocket.OPEN)) connectLive(sym);
+                }
+                lastVisible = now;
+            } else {
+                lastVisible = Date.now();
+            }
+        });
+
+        // Heartbeat to ensure connection hasn't silently died (Zombies)
+        setInterval(() => {
+            Object.keys(STATES).forEach(sym => {
+                const s = STATES[sym];
+                if (!s || !s.ws || s.ws.readyState === WebSocket.CLOSED || (s.wsDOM && s.wsDOM.readyState === WebSocket.CLOSED)) scheduleReconnect(sym);
+            });
+        }, 10000);
+
+        // Data Sync System Removed for performance
+
+        const getSY = p => { const s = STATES[SETTINGS.symbol]; return (h/dpr)/2 - (p - (s?s.scrollY:0)) * (SETTINGS.rowH * (s?s.zoomY:1) / SETTINGS.tick); };
+        const getP = y => { const s = STATES[SETTINGS.symbol]; return (s?s.scrollY:0) + ((h/dpr)/2 - y) / (SETTINGS.rowH * (s?s.zoomY:1) / SETTINGS.tick); };
+        const getT = x => {
+            const s = STATES[SETTINGS.symbol]; if(!s) return Date.now();
+            const now = s.bars[s.bars.length-1]?.t || Date.now();
+            return now - ((w/dpr) - SETTINGS.domW - 60 - x + s.scrollX) / (SETTINGS.pxMin * s.zoomX) * SETTINGS.tfMs;
+        };
+        const getSX = t => {
+            const s = STATES[SETTINGS.symbol]; if(!s) return 0;
+            const now = s.bars[s.bars.length-1]?.t || Date.now();
+            return (w/dpr) - SETTINGS.domW - 60 - ((now - t)/SETTINGS.tfMs) * (SETTINGS.pxMin * s.zoomX) + s.scrollX;
+        };
+
+
+
+        function formatBubbleVal(val) {
+            const absV = Math.abs(val);
+            if (absV >= 1000000) return (val / 1000000).toFixed(2) + 'M';
+            if (absV >= 1000) return (val / 1000).toFixed(1) + 'K';
+            return val.toFixed(0);
+        }
+
+        function hexToRgba(hex, alpha) {
+            if (!hex) return `rgba(255, 255, 255, ${alpha})`;
+            if (hex.startsWith('rgba')) return hex;
+            if (hex.startsWith('rgb')) return hex.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+            
+            let r = 0, g = 0, b = 0;
+            if (hex.length === 4) {
+                r = parseInt(hex[1] + hex[1], 16);
+                g = parseInt(hex[2] + hex[2], 16);
+                b = parseInt(hex[3] + hex[3], 16);
+            } else if (hex.length === 7) {
+                r = parseInt(hex.substring(1, 3), 16);
+                g = parseInt(hex.substring(3, 5), 16);
+                b = parseInt(hex.substring(5, 7), 16);
+            }
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function renderDeltaProfileDrawing(d, ctx, cw, ch, rh, bars) {
+            const state = STATES[SETTINGS.symbol];
+            if (!state) return;
+
+            let tStart = Math.min(d.t1, d.t2), tEnd = Math.max(d.t1, d.t2);
+            
+            // Live Update Logic: If the drawing is marked as live, the end time follows the current bar
+            if (d.isLive) {
+                const lastBar = state.bars[state.bars.length - 1];
+                if (lastBar) tEnd = lastBar.t + SETTINGS.tfMs;
+                else tEnd = Date.now();
+            }
+
+            const xStart = getSX(tStart), xEnd = getSX(tEnd);
+            
+            // Boundary lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(xStart, 0); ctx.lineTo(xStart, ch); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, ch); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 1. DATA AGGREGATION
+            const prof = {};
+            const bubbles = [];
+
+            // DATA SOURCE: merge full-history chart bars + 1m precision bars for complete coverage
+            // Chart bars cover full loaded history; 1m bars add precision for recent data
+            const precisionBars = (state.tfBars && state.tfBars['1m']) ? state.tfBars['1m'] : [];
+            const precisionDur = 60000;
+            const precision1mStart = precisionBars.length > 0 ? precisionBars[0].t : Infinity;
+
+            // Build merged source: use 1m for recent, chart bars for older history
+            const allSourceBars = [];
+            bars.forEach(b => {
+                if (b.t + SETTINGS.tfMs > tStart && b.t < tEnd) {
+                    // Only use chart bar if not covered by 1m data
+                    if (b.t < precision1mStart) allSourceBars.push({ bar: b, dur: SETTINGS.tfMs, isChartBar: true });
+                }
+            });
+            precisionBars.forEach(b => {
+                if (b.t + precisionDur > tStart && b.t < tEnd) {
+                    allSourceBars.push({ bar: b, dur: precisionDur, isChartBar: false });
+                }
+            });
+
+            // Adaptive Binning: scan ALL sources for actual data range
+            let dataMinP = Infinity, dataMaxP = -Infinity;
+            allSourceBars.forEach(({ bar: b }) => {
+                if (b.l < dataMinP) dataMinP = b.l;
+                if (b.h > dataMaxP) dataMaxP = b.h;
+            });
+            if (dataMinP === Infinity) return;
+            const rangeP = dataMaxP - dataMinP;
+            d.lastMinP = dataMinP; d.lastMaxP = dataMaxP; // Store for hit-testing
+            const dynamicTick = Math.max(SETTINGS.tick, rangeP / 150);
+            const binRh = Math.max(1, (dynamicTick / SETTINGS.tick) * rh);
+
+            allSourceBars.forEach(({ bar: b }) => {
+                if (b.vAP && Object.keys(b.vAP).length > 0) {
+                    for (let p in b.vAP) {
+                        const binP = Math.round(+p / dynamicTick) * dynamicTick;
+                        if (!prof[binP]) prof[binP] = { d: 0, v: 0 };
+                        prof[binP].d += (b.vAP[p].b - b.vAP[p].s);
+                        prof[binP].v += b.vAP[p].t;
+                    }
+                } else {
+                    const binP = Math.round(b.c / dynamicTick) * dynamicTick;
+                    if (!prof[binP]) prof[binP] = { d: 0, v: 0 };
+                    prof[binP].d += (b.buys - b.sells);
+                    prof[binP].v += b.v;
+                }
+            });
+
+            // 2. BUBBLE DETECTION (Imbalance-Based Filtering)
+            // Use 'bars' (current chart timeframe) for bubbles
+            let totalDeltaInBubbleRange = 0;
+            let bubbleBarCount = 0;
+            
+            bars.forEach(b => {
+                if (b.t + SETTINGS.tfMs > tStart && b.t < tEnd) {
+                    totalDeltaInBubbleRange += Math.abs(b.buys - b.sells);
+                    bubbleBarCount++;
+                }
+            });
+
+            const avgDeltaForBubbles = bubbleBarCount > 0 ? totalDeltaInBubbleRange / bubbleBarCount : 0;
+            // Imbalance Threshold: 4x average delta of the active timeframe, or 0.3x whale threshold
+            // This ensures only "Aggressive" imbalances (like 31 vs 237) get bubbles.
+            const imbalanceThreshold = Math.max(avgDeltaForBubbles * 4.5, (SETTINGS.whaleThres || 10) * 0.35);
+
+            bars.forEach(b => {
+                const barDelta = Math.abs(b.buys - b.sells);
+                if (b.t + SETTINGS.tfMs > tStart && b.t < tEnd && barDelta > imbalanceThreshold) {
+                    let maxVol = 0;
+                    let pocPrice = b.c;
+                    let pocDelta = b.buys - b.sells;
+                    let isBull = b.buys >= b.sells;
+                    
+                    if (b.vAP && Object.keys(b.vAP).length > 0) {
+                        for (let pStr in b.vAP) {
+                            const cluster = b.vAP[pStr];
+                            const clusterDelta = Math.abs(cluster.b - cluster.s);
+                            // Highlight the cluster with the highest IMBALANCE, not just volume
+                            if (clusterDelta > maxVol) {
+                                maxVol = clusterDelta; 
+                                pocPrice = +pStr;
+                                pocDelta = cluster.b - cluster.s;
+                                isBull = cluster.b >= cluster.s;
+                            }
+                        }
+                    }
+                    
+                    bubbles.push({
+                        t: b.t,
+                        p: pocPrice,
+                        v: barDelta, // Bubble size represents the magnitude of imbalance
+                        delta: pocDelta,
+                        isBull: isBull
+                    });
+                }
+            });
+
+            let maxAbsDelta = 0;
+            let maxVol = 0;
+            let poc = 0;
+            for (let p in prof) {
+                if (Math.abs(prof[p].d) > maxAbsDelta) maxAbsDelta = Math.abs(prof[p].d);
+                if (prof[p].v > maxVol) { maxVol = prof[p].v; poc = +p; }
+            }
+
+            if (maxAbsDelta === 0 && maxVol === 0) return;
+
+            // 2. RENDERING PROFILE
+            const profileWidth = 180; // Fixed width for the histogram
+
+            for (let p in prof) {
+                const y = getSY(+p);
+                if (y < -binRh || y > ch + binRh) continue;
+                
+                const level = prof[p];
+
+                // Right Side: Delta Profile
+                const deltaW = (Math.abs(level.d) / (maxAbsDelta || 1)) * profileWidth;
+                ctx.fillStyle = level.d >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+                ctx.fillRect(xStart, y - binRh/2, deltaW, Math.max(1, binRh - 0.5));
+
+                // Left Side: Volume Profile
+                const volW = (level.v / (maxVol || 1)) * profileWidth;
+                ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+                ctx.fillRect(xStart - volW, y - binRh/2, volW, Math.max(1, binRh - 0.5));
+
+                // POC Highlight
+                if (+p === poc) {
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(xStart - volW, y);
+                    ctx.lineTo(xStart + deltaW, y);
+                    ctx.stroke();
+                }
+            }
+
+            // 3. RENDERING DELTA BUBBLES (Delta Profile drawing)
+            bubbles.forEach(bb => {
+                // Snap x to the nearest current-TF candle center
+                const snapT = Math.floor(bb.t / SETTINGS.tfMs) * SETTINGS.tfMs;
+                const bx = getSX(snapT);
+                if (bx < SETTINGS.profW || bx > cw - SETTINGS.domW) return;
+
+                // Clamp y to the candle's high-low range for that TF bar
+                const refBar = bars.find(b => b.t === snapT);
+                const clampedP = refBar ? Math.max(refBar.l, Math.min(refBar.h, bb.p)) : bb.p;
+                const by = getSY(clampedP);
+
+                // Aggressive non-linear scaling for maximum differentiation
+                // Scale reference by timeframe to ensure consistent sizing across 1m, 5m, etc.
+                const tfFactor = Math.max(1, (SETTINGS.tfMs || 60000) / 60000);
+                const maxRef = (SETTINGS.whaleThres || 10) * 10 * tfFactor; 
+                const rawRatio = Math.min(1.0, bb.v / maxRef);
+                const ratio = Math.pow(rawRatio, 1.5); // Power function keeps small trades very small
+                const radius = 4 + ratio * 32; // Range from 4px to 36px
+                
+                // Dynamic outer glow - scales with size so small bubbles don't look bulky
+                ctx.shadowBlur = radius * 0.8;
+                ctx.shadowColor = bb.isBull ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+                
+                // Radial gradient fill
+                const grad = ctx.createRadialGradient(bx - radius*0.3, by - radius*0.3, radius*0.05, bx, by, radius);
+                grad.addColorStop(0, bb.isBull ? 'rgba(52,211,153,0.95)' : 'rgba(252,165,165,0.95)');
+                grad.addColorStop(1, bb.isBull ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.75)');
+
+                ctx.beginPath();
+                ctx.arc(bx, by, radius, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // Bubble Value (Delta)
+                ctx.fillStyle = '#FFF';
+                let fontSize = 5;
+                if (radius > 20) fontSize = 10;
+                else if (radius > 12) fontSize = 8;
+                else if (radius > 8) fontSize = 6;
+                
+                ctx.font = `bold ${fontSize}px Roboto Mono`;
+                ctx.textAlign = 'center';
+                const sign = bb.delta > 0 ? '+' : (bb.delta < 0 ? '-' : '');
+                if (radius > 6) ctx.fillText(sign + formatBubbleVal(Math.abs(bb.delta)), bx, by + fontSize/2);
+            });
+        }
+
+        function renderTPOProfileDrawing(d, ctx, cw, ch, rh, bars) {
+            const state = STATES[SETTINGS.symbol];
+            if (!state) return;
+
+            let tStart = Math.min(d.t1, d.t2), tEnd = Math.max(d.t1, d.t2);
+            if (d.isLive) {
+                const lastBar = state.bars[state.bars.length - 1];
+                if (lastBar) tEnd = lastBar.t + SETTINGS.tfMs;
+                else tEnd = Date.now();
+            }
+
+            const xStart = getSX(tStart), xEnd = getSX(tEnd);
+            
+            // Boundary lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(xStart, 0); ctx.lineTo(xStart, ch); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, ch); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 1. TPO CALCULATION
+            const blockDur = Math.max(300000, SETTINGS.tfMs);
+            const tpoData = {};
+
+            // DATA SOURCE: merge full-history chart bars + 1m precision for complete coverage
+            const calcBars1m = (state.tfBars && state.tfBars['1m']) ? state.tfBars['1m'] : [];
+            const barDur1m = 60000;
+            const precision1mStart = calcBars1m.length > 0 ? calcBars1m[0].t : Infinity;
+
+            const allSourceBars = [];
+            bars.forEach(b => {
+                if (b.t + SETTINGS.tfMs > tStart && b.t < tEnd && b.t < precision1mStart) {
+                    allSourceBars.push({ bar: b, dur: SETTINGS.tfMs });
+                }
+            });
+            calcBars1m.forEach(b => {
+                if (b.t + barDur1m > tStart && b.t < tEnd) {
+                    allSourceBars.push({ bar: b, dur: barDur1m });
+                }
+            });
+
+            // Adaptive Binning: scan ALL sources
+            let dataMinP = Infinity, dataMaxP = -Infinity;
+            allSourceBars.forEach(({ bar: b }) => {
+                if (b.l < dataMinP) dataMinP = b.l;
+                if (b.h > dataMaxP) dataMaxP = b.h;
+            });
+            if (dataMinP === Infinity) return;
+            const rangeP = dataMaxP - dataMinP;
+            d.lastMinP = dataMinP; d.lastMaxP = dataMaxP; // Store for hit-testing
+            const dynamicTick = Math.max(SETTINGS.tick, rangeP / 150);
+            const binRh = Math.max(1, (dynamicTick / SETTINGS.tick) * rh);
+
+            allSourceBars.forEach(({ bar: b }) => {
+                const blockId = Math.floor(b.t / blockDur);
+                const startP = Math.round(b.l / dynamicTick) * dynamicTick;
+                const endP = Math.round(b.h / dynamicTick) * dynamicTick;
+                for (let p = startP; p <= endP; p += dynamicTick) {
+                    const price = Math.round(p / dynamicTick) * dynamicTick;
+                    if (!tpoData[price]) tpoData[price] = new Set();
+                    tpoData[price].add(blockId);
+                }
+            });
+
+            let maxTPOs = 0, tpoPoc = 0;
+            for (let p in tpoData) {
+                const count = tpoData[p].size;
+                if (count > maxTPOs) { maxTPOs = count; tpoPoc = +p; }
+            }
+
+            if (maxTPOs === 0) return;
+
+            // 2. VALUE AREA CALCULATION (70% of total TPOs)
+            let totalTPOcount = 0;
+            const prices = Object.keys(tpoData).map(Number).sort((a,b) => a-b);
+            prices.forEach(p => totalTPOcount += tpoData[p].size);
+
+            const vaThreshold = totalTPOcount * 0.7;
+            let currentVaTPOs = maxTPOs;
+            let lowIdx = prices.indexOf(tpoPoc), highIdx = lowIdx;
+
+            while (currentVaTPOs < vaThreshold && (lowIdx > 0 || highIdx < prices.length - 1)) {
+                const prevTPOs = lowIdx > 0 ? tpoData[prices[lowIdx - 1]].size : 0;
+                const nextTPOs = highIdx < prices.length - 1 ? tpoData[prices[highIdx + 1]].size : 0;
+
+                if (prevTPOs >= nextTPOs && lowIdx > 0) {
+                    currentVaTPOs += prevTPOs; lowIdx--;
+                } else if (highIdx < prices.length - 1) {
+                    currentVaTPOs += nextTPOs; highIdx++;
+                } else if (lowIdx > 0) {
+                    currentVaTPOs += prevTPOs; lowIdx--;
+                } else break;
+            }
+            const tpoVal = prices[lowIdx], tpoVah = prices[highIdx];
+
+            // 3. RENDERING TPO BLOCKS
+            const blockW = 12; 
+            const startX = xStart;
+
+            for (let p of prices) {
+                const y = getSY(p);
+                if (y < -binRh || y > ch + binRh) continue;
+                
+                const blocks = tpoData[p].size;
+                const isPoc = p === tpoPoc;
+                const isInVa = p >= tpoVal && p <= tpoVah;
+
+                for (let i = 0; i < blocks; i++) {
+                    const bx = startX + i * (blockW + 1);
+                    if (bx > cw - SETTINGS.domW) break;
+
+                    if (isPoc) {
+                        ctx.fillStyle = '#2962FF'; 
+                    } else if (isInVa) {
+                        const hue = (i * 20) % 360;
+                        ctx.fillStyle = `hsla(${hue}, 80%, 55%, 0.8)`;
+                    } else {
+                        const hue = (i * 20) % 360;
+                        ctx.fillStyle = `hsla(${hue}, 30%, 40%, 0.35)`;
+                    }
+                    
+                    const pad = 1;
+                    ctx.fillRect(bx, y - binRh/2 + pad, blockW - pad*2, Math.max(1, binRh - pad*2));
+                    
+                    if (binRh > 14 && i < 26) {
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 9px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(String.fromCharCode(65 + (i % 26)), bx + blockW/2, y + 3);
+                    }
+                }
+
+                if (isPoc) {
+                    ctx.strokeStyle = '#2962FF'; ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, y);
+                    ctx.lineTo(cw - SETTINGS.domW, y);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = '#2962FF';
+                    ctx.font = 'bold 10px Inter';
+                    ctx.textAlign = 'left';
+                    ctx.fillText("TPO POC", startX + 5, y - 5);
+                }
+            }
+
+            // 4. VA LABELS
+            const drawVALabel = (p, label, color) => {
+                const y = getSY(p);
+                if (y < 0 || y > ch) return;
+                ctx.strokeStyle = color; ctx.setLineDash([2, 2]);
+                ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(cw - SETTINGS.domW, y); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = color;
+                ctx.font = 'bold 10px Inter';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${label}: ${p.toFixed(SETTINGS.tick < 0.01 ? 4 : 2)}`, startX + 5, y - 5);
+            };
+
+            drawVALabel(tpoVah, 'TPO VAH', '#00FFFF');
+            drawVALabel(tpoVal, 'TPO VAL', '#00FFFF');
+        }
+
+        function renderVolumeProfileDrawing(d, ctx, cw, ch, rh, bars) {
+            const state = STATES[SETTINGS.symbol];
+            if (!state) return;
+
+            let tStart = Math.min(d.t1, d.t2), tEnd = Math.max(d.t1, d.t2);
+            if (d.isLive) {
+                const lastBar = state.bars[state.bars.length - 1];
+                if (lastBar) tEnd = lastBar.t + SETTINGS.tfMs;
+                else tEnd = Date.now();
+            }
+
+            const xStart = getSX(tStart), xEnd = getSX(tEnd);
+            
+            // Boundary lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(xStart, 0); ctx.lineTo(xStart, ch); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, ch); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // DATA SOURCE: merge full-history chart bars + 1m precision for complete coverage
+            const precisionBars = (state.tfBars && state.tfBars['1m']) ? state.tfBars['1m'] : [];
+            const precisionDur = 60000;
+            const precision1mStart = precisionBars.length > 0 ? precisionBars[0].t : Infinity;
+
+            const allSourceBars = [];
+            bars.forEach(b => {
+                if (b.t + SETTINGS.tfMs > tStart && b.t < tEnd && b.t < precision1mStart) {
+                    allSourceBars.push(b);
+                }
+            });
+            precisionBars.forEach(b => {
+                if (b.t + precisionDur > tStart && b.t < tEnd) {
+                    allSourceBars.push(b);
+                }
+            });
+
+            // Adaptive Binning: scan ALL sources for actual data range
+            let dataMinP = Infinity, dataMaxP = -Infinity;
+            allSourceBars.forEach(b => {
+                if (b.l < dataMinP) dataMinP = b.l;
+                if (b.h > dataMaxP) dataMaxP = b.h;
+            });
+            if (dataMinP === Infinity) return;
+            const rangeP = dataMaxP - dataMinP;
+            d.lastMinP = dataMinP; d.lastMaxP = dataMaxP; // Store for hit-testing
+
+            // --- USE SETTINGS FROM DRAWING ---
+            const rowsLayout = d.rowsLayout || 'number';
+            const rowSize = d.rowSize || 150;
+            const volumeMode = d.volumeMode || 'total';
+            const vaVolume = (d.vaVolume || 70) / 100;
+            const extendRight = d.extendRight || false;
+
+            let dynamicTick = SETTINGS.tick;
+            if (rowsLayout === 'number') {
+                dynamicTick = Math.max(SETTINGS.tick, rangeP / rowSize);
+            } else {
+                dynamicTick = Math.max(SETTINGS.tick, rowSize * SETTINGS.tick);
+            }
+            
+            const binRh = Math.max(1, (dynamicTick / SETTINGS.tick) * rh);
+
+            // DATA AGGREGATION: fill volume into bins
+            const prof = {};
+            let totalVolume = 0;
+
+            allSourceBars.forEach(b => {
+                if (b.vAP && Object.keys(b.vAP).length > 0) {
+                    for (let p in b.vAP) {
+                        const binP = Math.round(+p / dynamicTick) * dynamicTick;
+                        if (!prof[binP]) prof[binP] = { t: 0, b: 0, s: 0 };
+                        prof[binP].t += b.vAP[p].t;
+                        prof[binP].b += b.vAP[p].b;
+                        prof[binP].s += b.vAP[p].s;
+                        totalVolume += b.vAP[p].t;
+                    }
+                } else {
+                    const binP = Math.round(b.c / dynamicTick) * dynamicTick;
+                    if (!prof[binP]) prof[binP] = { t: 0, b: 0, s: 0 };
+                    prof[binP].t += b.v;
+                    prof[binP].b += b.buys;
+                    prof[binP].s += b.sells;
+                    totalVolume += b.v;
+                }
+            });
+
+            let maxVol = 0, poc = 0;
+            const prices = Object.keys(prof).map(Number).sort((a, b) => a - b);
+            prices.forEach(p => {
+                if (prof[p].t > maxVol) { maxVol = prof[p].t; poc = p; }
+            });
+
+            if (maxVol === 0) return;
+
+            // 3. VALUE AREA CALCULATION
+            const vaThreshold = totalVolume * vaVolume;
+            let currentVaVol = maxVol;
+            let lowIdx = prices.indexOf(poc), highIdx = lowIdx;
+
+            while (currentVaVol < vaThreshold && (lowIdx > 0 || highIdx < prices.length - 1)) {
+                const prevVol = lowIdx > 0 ? prof[prices[lowIdx - 1]].t : 0;
+                const nextVol = highIdx < prices.length - 1 ? prof[prices[highIdx + 1]].t : 0;
+
+                if (prevVol >= nextVol && lowIdx > 0) {
+                    currentVaVol += prevVol; lowIdx--;
+                } else if (highIdx < prices.length - 1) {
+                    currentVaVol += nextVol; highIdx++;
+                } else if (lowIdx > 0) {
+                    currentVaVol += prevVol; lowIdx--;
+                } else break;
+            }
+
+            const val = prices[lowIdx], vah = prices[highIdx];
+
+            // 4. RENDERING - full range histogram
+            const profileWidth = 200;
+            const xLineEnd = extendRight ? cw - SETTINGS.domW : xStart + profileWidth;
+
+            for (let p of prices) {
+                const y = getSY(p);
+                if (y < -binRh || y > ch + binRh) continue;
+
+                const level = prof[p];
+                const vol = level.t;
+                const w = (vol / maxVol) * profileWidth;
+                const isInVa = p >= val && p <= vah;
+
+                if (volumeMode === 'updown') {
+                    const buyW = (level.b / maxVol) * profileWidth;
+                    const sellW = (level.s / maxVol) * profileWidth;
+                    
+                    ctx.fillStyle = isInVa ? 'rgba(16, 185, 129, 0.8)' : 'rgba(16, 185, 129, 0.4)';
+                    ctx.fillRect(xStart, y - binRh / 2, buyW, Math.max(1, binRh - 0.5));
+                    
+                    ctx.fillStyle = isInVa ? 'rgba(239, 68, 68, 0.8)' : 'rgba(239, 68, 68, 0.4)';
+                    ctx.fillRect(xStart + buyW, y - binRh / 2, sellW, Math.max(1, binRh - 0.5));
+                } else {
+                    ctx.fillStyle = isInVa ? 'rgba(41, 98, 255, 0.65)' : 'rgba(156, 163, 175, 0.3)';
+                    ctx.fillRect(xStart, y - binRh / 2, w, Math.max(1, binRh - 0.5));
+                }
+
+                if (p === poc) {
+                    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(xStart, y); ctx.lineTo(xStart + (volumeMode === 'updown' ? (level.b+level.s)/maxVol*profileWidth : w), y); ctx.stroke();
+                }
+            }
+
+            // Labels
+            ctx.font = 'bold 10px Inter';
+            ctx.textAlign = 'left';
+            
+            const drawLabel = (p, label, color) => {
+                const y = getSY(p);
+                if (y < 0 || y > ch) return;
+                ctx.strokeStyle = color; ctx.setLineDash([2, 2]);
+                ctx.beginPath(); ctx.moveTo(xStart, y); ctx.lineTo(xLineEnd, y); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = color;
+                ctx.fillText(`${label}: ${p.toFixed(SETTINGS.tick < 0.01 ? 4 : 2)}`, xStart + 5, y - 5);
+            };
+
+            drawLabel(vah, 'VAH', '#00FFFF');
+            drawLabel(val, 'VAL', '#00FFFF');
+            drawLabel(poc, 'POC', '#FFD700');
+        }
+
+        function renderRiskReward(d, ctx, cw, ch, rh) {
+            const yE = getSY(d.entry), yT = getSY(d.target), yS = getSY(d.stop);
+            const x1 = getSX(d.t1), x2 = getSX(d.t2);
+            const w = x2 - x1;
+            const isLong = d.type === 'long';
+
+            // Target Area (Green for Long, Red for Short)
+            ctx.fillStyle = isLong ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+            ctx.fillRect(x1, Math.min(yE, yT), w, Math.abs(yE - yT));
+            
+            // Stop Area (Red for Long, Green for Short)
+            ctx.fillStyle = isLong ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)';
+            ctx.fillRect(x1, Math.min(yE, yS), w, Math.abs(yE - yS));
+
+            // Lines
+            ctx.setLineDash([]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.moveTo(x1, yE); ctx.lineTo(x2, yE); ctx.stroke(); // Entry
+            ctx.strokeStyle = isLong ? '#10B981' : '#EF4444';
+            ctx.beginPath(); ctx.moveTo(x1, yT); ctx.lineTo(x2, yT); ctx.stroke(); // Target
+            ctx.strokeStyle = isLong ? '#EF4444' : '#10B981';
+            ctx.beginPath(); ctx.moveTo(x1, yS); ctx.lineTo(x2, yS); ctx.stroke(); // Stop
+
+            // Handles (if active tool is cursor)
+            if (activeTool === 'cursor') {
+                ctx.fillStyle = '#FFFFFF';
+                [yE, yT, yS].forEach(y => {
+                    ctx.beginPath(); ctx.arc(x1 + w/2, y, 4, 0, Math.PI*2); ctx.fill();
+                });
+                // Side handles
+                ctx.beginPath(); ctx.arc(x1, yE, 4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(x2, yE, 4, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Labels
+            const rr = Math.abs(d.target - d.entry) / Math.max(0.0001, Math.abs(d.stop - d.entry));
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 11px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(`R:R ${rr.toFixed(2)}`, x1 + w/2, yE - 10);
+            
+            ctx.font = '10px Roboto Mono';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = isLong ? '#10B981' : '#EF4444';
+            ctx.fillText(`T: ${d.target.toFixed(SETTINGS.tick < 0.01 ? 4 : 2)}`, x2 + 5, yT + 4);
+            ctx.fillStyle = isLong ? '#EF4444' : '#10B981';
+            ctx.fillText(`S: ${d.stop.toFixed(SETTINGS.tick < 0.01 ? 4 : 2)}`, x2 + 5, yS + 4);
+        }
+
+        function renderSKSystem(ctx, cw, ch, rh, bars) {
+            if (bars.length < 50) return;
+            
+            // 1. SEQUENCE DETECTION (Last 150 bars)
+            const windowSize = 150;
+            const recentBars = bars.slice(-windowSize);
+            let highest = -Infinity, lowest = Infinity;
+            let hIdx = -1, lIdx = -1;
+            
+            recentBars.forEach((b, i) => {
+                if (b.h > highest) { highest = b.h; hIdx = i; }
+                if (b.l < lowest) { lowest = b.l; lIdx = i; }
+            });
+            
+            if (hIdx === -1 || lIdx === -1) return;
+            
+            const isBull = lIdx < hIdx;
+            const startP = isBull ? lowest : highest;
+            const endP = isBull ? highest : lowest;
+            const startT = recentBars[isBull ? lIdx : hIdx].t;
+            const endT = recentBars[isBull ? hIdx : lIdx].t;
+            
+            const range = Math.abs(endP - startP);
+            if (range === 0) return;
+            
+            // 2. FIB LEVELS
+            const fibs = [
+                { v: 0.382, label: '38.2%', color: 'rgba(255,255,255,0.3)' },
+                { v: 0.50, label: '50.0%', color: '#F59E0B' },
+                { v: 0.618, label: '61.8% (GOLD)', color: '#F59E0B' },
+                { v: 0.667, label: '66.7%', color: '#F59E0B' },
+                { v: 1.272, label: 'T1 (1.272)', color: '#10B981' },
+                { v: 1.618, label: 'T2 (1.618)', color: '#10B981' }
+            ];
+            
+            const getFibP = (val) => isBull ? endP - (range * val) : endP + (range * val);
+            const getExtP = (val) => isBull ? startP + (range * val) : startP - (range * val);
+            
+            // 3. DRAWING
+            const x1 = getSX(startT), x2 = cw - SETTINGS.domW;
+            
+            // Draw Golden Zone Box (50% - 66.7%)
+            const p50 = getFibP(0.5), p66 = getFibP(0.667);
+            const y50 = getSY(p50), y66 = getSY(p66);
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+            ctx.fillRect(x1, Math.min(y50, y66), x2 - x1, Math.abs(y50 - y66));
+            
+            // Draw Levels
+            fibs.forEach(f => {
+                let p;
+                if (f.v > 1) p = getExtP(f.v);
+                else p = getFibP(f.v);
+                
+                const y = getSY(p);
+                if (y < 0 || y > ch) return;
+                
+                ctx.strokeStyle = f.color;
+                ctx.lineWidth = f.v >= 0.5 && f.v <= 0.667 ? 1.5 : 1;
+                ctx.setLineDash(f.v > 1 ? [5, 5] : []);
+                ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = f.color;
+                ctx.font = 'bold 10px Roboto Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(f.label, x2 - 5, y - 5);
+            });
+            
+            // Draw Sequence Line
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(getSX(startT), getSY(startP)); ctx.lineTo(getSX(endT), getSY(endP)); ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Labels
+            ctx.fillStyle = '#F59E0B';
+            ctx.font = 'bold 12px Inter';
+            ctx.textAlign = 'left';
+            ctx.fillText(`SK SYSTEM: ${isBull ? 'BULLISH' : 'BEARISH'} SEQUENCE`, x1 + 10, Math.min(y50, y66) - 10);
+        }
+
+        function renderSMC(ctx, cw, ch, rh, bars) {
+            if (bars.length < 60) return;
+            const state = STATES[SETTINGS.symbol];
+            
+            // 1. SWING STRUCTURE (Swing Highs / Lows)
+            const swings = [];
+            for (let i = 2; i < bars.length - 2; i++) {
+                const b = bars[i], b1 = bars[i-1], b2 = bars[i-2], a1 = bars[i+1], a2 = bars[i+2];
+                if (b.h > b1.h && b.h > b2.h && b.h > a1.h && b.h > a2.h) swings.push({ type: 'high', p: b.h, t: b.t, idx: i });
+                if (b.l < b1.l && b.l < b2.l && b.l < a1.l && b.l < a2.l) swings.push({ type: 'low', p: b.l, t: b.t, idx: i });
+            }
+
+            // 2. ORDER BLOCKS (Supply & Demand)
+            const obs = [];
+            for (let i = 2; i < bars.length - 2; i++) {
+                const b = bars[i];
+                // Bullish OB (Down candle before up move)
+                if (b.c < b.o && bars[i+1].c > b.h && bars[i+2].c > b.h) {
+                    obs.push({ type: 'bull', top: b.h, bot: b.l, t: b.t, active: true });
+                }
+                // Bearish OB (Up candle before down move)
+                if (b.c > b.o && bars[i+1].c < b.l && bars[i+2].c < b.l) {
+                    obs.push({ type: 'bear', top: b.h, bot: b.l, t: b.t, active: true });
+                }
+            }
+
+            // 3. BOS & CHOCH LABELING
+            const labels = [];
+            for (let i = 1; i < swings.length; i++) {
+                const s = swings[i], prevS = swings[i-1];
+                const breakout = bars.find(b => b.t > s.t && (s.type === 'high' ? b.c > s.p : b.c < s.p));
+                if (breakout) {
+                    const isCHoCH = (s.type !== prevS.type);
+                    labels.push({ type: isCHoCH ? 'CHoCH' : 'BOS', p: s.p, t: breakout.t, side: s.type });
+                }
+            }
+
+            // 4. RENDERING SMC
+            // Draw Order Blocks
+            obs.slice(-8).forEach(ob => {
+                const y1 = getSY(ob.top), y2 = getSY(ob.bot);
+                const x1 = getSX(ob.t), x2 = cw - SETTINGS.domW;
+                ctx.fillStyle = ob.type === 'bull' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+                ctx.fillRect(x1, Math.min(y1, y2), x2 - x1, Math.abs(y1 - y2));
+                ctx.strokeStyle = ob.type === 'bull' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+                ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y1); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x1, y2); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]);
+                
+                ctx.fillStyle = ob.type === 'bull' ? '#10B981' : '#EF4444'; ctx.font = '8px Roboto Mono';
+                ctx.textAlign = 'left'; ctx.fillText(ob.type === 'bull' ? 'DEMAND (OB)' : 'SUPPLY (OB)', x1 + 5, Math.min(y1, y2) + 10);
+            });
+
+            // Draw BOS / CHoCH Labels
+            labels.slice(-5).forEach(l => {
+                const x = getSX(l.t), y = getSY(l.p);
+                ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 20, y); ctx.lineTo(x + 20, y); ctx.stroke();
+                ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 9px Inter'; ctx.textAlign = 'center';
+                ctx.fillText(l.type, x, y - 5);
+            });
+
+            // Premium/Discount visualization
+            const lastSwingH = swings.reverse().find(s => s.type === 'high');
+            const lastSwingL = swings.find(s => s.type === 'low');
+            if (lastSwingH && lastSwingL) {
+                const mid = (lastSwingH.p + lastSwingL.p) / 2;
+                const yMid = getSY(mid);
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.setLineDash([5, 5]);
+                ctx.beginPath(); ctx.moveTo(SETTINGS.profW, yMid); ctx.lineTo(cw - SETTINGS.domW, yMid); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.font = 'bold 8px Roboto Mono';
+                ctx.fillText('EQUILIBRIUM', cw - SETTINGS.domW - 60, yMid - 5);
+            }
+        }
+
+        function renderCRTSetup(ctx, cw, ch, rh, bars) {
+            if (bars.length < 100) return;
+            const state = STATES[SETTINGS.symbol];
+            
+            // 1. ELITE FILTERS
+            const lookback = 100;
+            const recentBars = bars.slice(-lookback);
+            const avgH = recentBars.reduce((s, b) => s + b.h, 0) / lookback;
+            const avgL = recentBars.reduce((s, b) => s + b.l, 0) / lookback;
+            const trend = bars[bars.length-1].c > (avgH + avgL)/2 ? 'bull' : 'bear';
+
+            // 2. DETECT ALL POTENTIAL SETUPS (History Tracking)
+            const d = 12;
+            const pivots = [];
+            for (let i = d; i < bars.length - d; i++) {
+                const b = bars[i];
+                let isH = true, isL = true;
+                for (let j = 1; j <= d; j++) {
+                    if (bars[i-j].h >= b.h || bars[i+j].h > b.h) isH = false;
+                    if (bars[i-j].l <= b.l || bars[i+j].l < b.l) isL = false;
+                }
+                if (isH) pivots.push({ type: 'H', p: b.h, t: b.t, idx: i });
+                if (isL) pivots.push({ type: 'L', p: b.l, t: b.t, idx: i });
+            }
+
+            const setups = [];
+            for (let i = pivots.length - 10; i < pivots.length; i++) {
+                const p = pivots[i]; if (!p) continue;
+                // Find displacement after pivot
+                const nextBars = bars.slice(p.idx, p.idx + 20);
+                if (nextBars.length < 5) continue;
+                
+                const clearType = (p.type === 'H' ? 'bear' : 'bull');
+                const breakout = nextBars.find(b => clearType === 'bull' ? b.c > p.p : b.c < p.p);
+                
+                if (breakout) {
+                    const fvgIdx = bars.findIndex(b => b.t === breakout.t);
+                    const b1 = bars[fvgIdx-1], b2 = bars[fvgIdx], b3 = bars[fvgIdx+1];
+                    if (b1 && b3) {
+                        let fvg = null;
+                        if (clearType === 'bull' && b1.h < b3.l) fvg = { top: b3.l, bot: b1.h, t: b2.t };
+                        if (clearType === 'bear' && b1.l > b3.h) fvg = { top: b1.l, bot: b3.h, t: b2.t };
+                        
+                        if (fvg) {
+                            const entry = (fvg.top + fvg.bot) / 2;
+                            const sl = clearType === 'bull' ? p.p - (avgH-avgL)*0.05 : p.p + (avgH-avgL)*0.05;
+                            const risk = Math.abs(entry - sl);
+                            setups.push({
+                                type: clearType, entry, sl, tp: clearType === 'bull' ? entry + risk*2.5 : entry - risk*2.5,
+                                fvg, t: breakout.t, active: (fvgIdx > bars.length - 30)
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 3. RENDERING ELITE VISUALS
+            setups.slice(-2).forEach(setup => {
+                const yE = getSY(setup.entry), yS = getSY(setup.sl), yT = getSY(setup.tp);
+                const x1 = getSX(setup.fvg.t), x2 = cw - SETTINGS.domW;
+                const alpha = setup.active ? 1.0 : 0.4;
+
+                // Neon Glow Entry Box
+                ctx.save();
+                ctx.shadowBlur = setup.active ? 15 : 0;
+                ctx.shadowColor = setup.type === 'bull' ? '#10B981' : '#EF4444';
+                const grad = ctx.createLinearGradient(x1, 0, x2, 0);
+                grad.addColorStop(0, setup.type === 'bull' ? `rgba(16, 185, 129, ${0.2 * alpha})` : `rgba(239, 68, 68, ${0.2 * alpha})`);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.fillRect(x1, Math.min(getSY(setup.fvg.top), getSY(setup.fvg.bot)), x2 - x1, Math.abs(getSY(setup.fvg.top) - getSY(setup.fvg.bot)));
+                ctx.restore();
+
+                // Advanced Lines with Icons
+                const drawEliteLine = (y, label, color, icon) => {
+                    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.globalAlpha = alpha;
+                    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+                    
+                    ctx.fillStyle = color; ctx.font = 'bold 11px Inter'; ctx.textAlign = 'right';
+                    ctx.fillText(`${icon} ${label}`, x2 - 10, y - 8);
+                };
+
+                drawEliteLine(yT, 'PROFIT TARGET', '#10B981', '🎯');
+                drawEliteLine(yE, 'INSTITUTIONAL ENTRY', '#FFFFFF', '🚀');
+                drawEliteLine(yS, 'PROTECTIVE STOP', '#EF4444', '🛡️');
+                ctx.globalAlpha = 1.0;
+
+                // Glowing Setup Header
+                if (setup.active) {
+                    ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 18px Inter'; ctx.textAlign = 'left';
+                    ctx.fillText(`⚡ CRT ${setup.type.toUpperCase()} SETUP`, x1 + 10, Math.min(yE, yT) - 60);
+                    ctx.font = '12px Inter'; ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                    ctx.fillText('Liquidity Clear + Displacement + FVG Verified', x1 + 10, Math.min(yE, yT) - 42);
+                }
+            });
+
+            // 4. CHoCH / BOS Elite Labels
+            pivots.slice(-5).forEach(p => {
+                const x = getSX(p.t), y = getSY(p.p);
+                ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = 'bold 9px Roboto Mono'; ctx.textAlign = 'center';
+                ctx.fillText(p.type === 'H' ? 'LIQUIDITY HIGH' : 'LIQUIDITY LOW', x, p.type === 'H' ? y - 15 : y + 25);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(cw - SETTINGS.domW, y); ctx.stroke(); ctx.setLineDash([]);
+            });
+
+            // ELITE MONITOR HUD
+            const hX = cw - SETTINGS.domW - 220, hY = 60, hW = 210, hH = 65;
+            const gradHud = ctx.createLinearGradient(hX, hY, hX, hY + hH);
+            gradHud.addColorStop(0, 'rgba(15, 23, 42, 0.95)'); gradHud.addColorStop(1, 'rgba(2, 6, 23, 0.95)');
+            ctx.fillStyle = gradHud; ctx.roundRect(hX, hY, hW, hH, 8); ctx.fill();
+            ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; ctx.roundRect(hX, hY, hW, hH, 8); ctx.stroke();
+            
+            ctx.fillStyle = '#94A3B8'; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center';
+            ctx.fillText('CRT ELITE MONITOR', hX + hW/2, hY + 20);
+            ctx.fillStyle = trend === 'bull' ? '#10B981' : '#EF4444'; ctx.font = 'bold 14px Inter';
+            ctx.fillText(trend.toUpperCase() + ' BIAS', hX + hW/2, hY + 42);
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px Roboto Mono';
+            ctx.fillText('SCANNING FOR SNIPER ENTRIES...', hX + hW/2, hY + 56);
+        }
+
+        function loop() {
+            if (!STATES[SETTINGS.symbol]) { requestAnimationFrame(loop); return; }
+            const state = STATES[SETTINGS.symbol];
+            const { bars, profile, orderBook, lastP, scrollY, scrollX, zoomX, zoomY, ws, heatMap } = state;
+            const cw=w/dpr, ch=h/dpr, rh=SETTINGS.rowH*zoomY, bw=(SETTINGS.pxMin*zoomX)*0.6;
+            ctx.fillStyle = THEME.bg; ctx.fillRect(0,0,cw,ch);
+
+            // Calculate current visible max for 'Smart High-Volume Filter'
+            let sessionMax = 0;
+            const visMin = getP(ch), visMax = getP(0);
+            bars.forEach(b => {
+                const x = getSX(b.t); if(x+bw/2 < SETTINGS.profW || x-bw/2 > cw-SETTINGS.domW) return;
+                Object.values(b.vAP).forEach(v => { if(v > sessionMax) sessionMax = v; });
+            });
+            if (sessionMax === 0) sessionMax = 1;
+
+            // Grid
+            ctx.strokeStyle = THEME.grid; ctx.lineWidth = 1; ctx.beginPath();
+            const sPr = Math.floor(getP(ch)/SETTINGS.tick)*SETTINGS.tick, ePr = Math.ceil(getP(0)/SETTINGS.tick)*SETTINGS.tick;
+            for(let p=sPr; p<=ePr; p+=SETTINGS.tick*10) { const y = getSY(p); ctx.moveTo(SETTINGS.profW, y); ctx.lineTo(cw-SETTINGS.domW, y); }
+            ctx.stroke();
+
+            // --- DAILY TPO & DAILY VOL PROFILE ---
+            if ((SETTINGS.showDailyTPO || SETTINGS.showDailyVP || SETTINGS.showDayOpen) && bars.length > 0) {
+                const days = {};
+                bars.forEach(b => {
+                    const date = new Date(b.t).toISOString().split('T')[0];
+                    if (!days[date]) days[date] = [];
+                    days[date].push(b);
+                });
+
+                for (let d in days) {
+                    const dayBars = days[d];
+                    const firstBar = dayBars[0];
+                    const lastBar = dayBars[dayBars.length - 1];
+                    const xStart = getSX(firstBar.t);
+                    const xEnd = getSX(lastBar.t + (SETTINGS.tfMs || 60000));
+                    
+                    if (xEnd < SETTINGS.profW || xStart > cw - SETTINGS.domW) continue;
+
+                    if (SETTINGS.showDayOpen) {
+                        const yOpen = getSY(firstBar.o);
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                        ctx.setLineDash([8, 4]); ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(xStart, yOpen); ctx.lineTo(xEnd, yOpen); ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; ctx.font = 'bold 9px Inter'; ctx.textAlign = 'left';
+                        ctx.fillText('DAY OPEN', xStart + 5, yOpen - 4);
+                    }
+
+                    if (SETTINGS.showDailyVP) {
+                        const pseudoD = { t1: firstBar.t, t2: lastBar.t + (SETTINGS.tfMs || 60000), isLive: false };
+                        renderVolumeProfileDrawing(pseudoD, ctx, cw, ch, rh, dayBars);
+                    }
+
+                    if (SETTINGS.showDailyTPO) {
+                        // Use a minimal TPO profile for the day
+                        const pseudoD = { t1: firstBar.t, t2: lastBar.t + (SETTINGS.tfMs || 60000), isLive: false, color: '#8A2BE2' };
+                        renderTPOProfileDrawing(pseudoD, ctx, cw, ch, rh, dayBars);
+                    }
+                }
+            }
+
+            // Render Drawings
+            drawings.forEach(d => {
+                ctx.strokeStyle = d.color || THEME.up; ctx.lineWidth = 2;
+                const isSelected = (d === selectedDrawing);
+                if (isSelected) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 3;
+                }
+
+                if(d.type === 'h-line') {
+                    const y = getSY(d.p); ctx.beginPath(); ctx.moveTo(SETTINGS.profW, y); ctx.lineTo(cw-SETTINGS.domW, y); ctx.stroke();
+                } else if(d.type === 'box') {
+                    const y1 = getSY(d.p1), y2 = getSY(d.p2), x1 = getSX(d.t1), x2 = getSX(d.t2);
+                    ctx.fillStyle = hexToRgba(d.color || THEME.tpo, d.opacity ?? 0.2);
+                    ctx.fillRect(x1, y1, x2-x1, y2-y1);
+                    ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+                } else if(d.type === 'delta-profile') {
+                    renderDeltaProfileDrawing(d, ctx, cw, ch, rh, bars);
+                } else if(d.type === 'tpo-profile') {
+                    renderTPOProfileDrawing(d, ctx, cw, ch, rh, bars);
+                } else if(d.type === 'volume-profile') {
+                    renderVolumeProfileDrawing(d, ctx, cw, ch, rh, bars);
+                } else if(d.type === 'line') {
+                    const x1 = getSX(d.t1), y1 = getSY(d.p1), x2 = getSX(d.t2), y2 = getSY(d.p2);
+                    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+                    if (activeTool === 'cursor' || isSelected) {
+                        ctx.fillStyle = '#FFF';
+                        ctx.beginPath(); ctx.arc(x1, y1, 4, 0, Math.PI*2); ctx.fill();
+                        ctx.beginPath(); ctx.arc(x2, y2, 4, 0, Math.PI*2); ctx.fill();
+                    }
+                } else if(d.type === 'long' || d.type === 'short') {
+                    renderRiskReward(d, ctx, cw, ch, rh);
+                }
+
+                if (isSelected) {
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 2;
+                }
+            });
+            
+            // --- SNR LEVELS ---
+            if (SETTINGS.showSNR) {
+                const bars = state.bars;
+                if (bars.length > 0) {
+                    const levels = [
+                        { label: 'S-POC', p: state.profile.poc, color: '#2962FF' },
+                        { label: 'S-HIGH', p: Math.max(...bars.map(b => b.h)), color: '#EF4444' },
+                        { label: 'S-LOW', p: Math.min(...bars.map(b => b.l)), color: '#10B981' }
+                    ];
+                    
+                    levels.forEach(l => {
+                        const y = getSY(l.p);
+                        if (y < 0 || y > ch) return;
+                        
+                        ctx.strokeStyle = l.color;
+                        ctx.setLineDash([2, 4]);
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(SETTINGS.profW, y);
+                        ctx.lineTo(cw - SETTINGS.domW, y);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        ctx.fillStyle = l.color;
+                        ctx.font = 'bold 10px Inter';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(l.label, SETTINGS.profW + 5, y - 4);
+                    });
+                }
+            }
+
+            // --- SK SYSTEM ---
+            if (SETTINGS.showSK) {
+                renderSKSystem(ctx, cw, ch, rh, bars);
+            }
+
+            // --- SMC SYSTEM ---
+            if (SETTINGS.showSMC) {
+                renderSMC(ctx, cw, ch, rh, bars);
+            }
+
+            // --- CRT SETUP ---
+            if (SETTINGS.showCRT) {
+                renderCRTSetup(ctx, cw, ch, rh, bars);
+            }
+
+            // --- VWAP WITH BANDS ---
+            if (SETTINGS.showVWAP && bars.length > 0) {
+                let sumPV = 0, sumV = 0, sumPV2 = 0;
+                let vwapData = [];
+                
+                // VWAP usually resets at start of day (midnight UTC for crypto)
+                let lastDate = null;
+
+                bars.forEach(b => {
+                    const d = new Date(b.t);
+                    const currentDate = d.getUTCDate();
+                    if (lastDate !== null && currentDate !== lastDate) {
+                        sumPV = 0; sumV = 0; sumPV2 = 0;
+                    }
+                    lastDate = currentDate;
+
+                    const p = (b.h + b.l + b.c) / 3;
+                    sumPV += p * b.v;
+                    sumV += b.v;
+                    sumPV2 += p * p * b.v;
+
+                    const vwap = sumPV / sumV;
+                    const variance = Math.max(0, (sumPV2 / sumV) - (vwap * vwap));
+                    const stdDev = Math.sqrt(variance);
+                    
+                    vwapData.push({ t: b.t, vwap, stdDev });
+                });
+
+                if (vwapData.length > 1) {
+                    const multipliers = [1, 2, 3];
+                    
+                    // Draw VWAP and Bands
+                    ctx.lineWidth = 1.5;
+                    // VWAP Line
+                    ctx.strokeStyle = THEME.vwap;
+                    ctx.beginPath();
+                    vwapData.forEach((d, i) => {
+                        const x = getSX(d.t); const y = getSY(d.vwap);
+                        if (x < SETTINGS.profW || x > cw - SETTINGS.domW) return;
+                        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+
+                    // Bands
+                    ctx.setLineDash([5, 5]);
+                    ctx.globalAlpha = 0.6;
+                    multipliers.forEach(m => {
+                        // Upper
+                        ctx.beginPath();
+                        vwapData.forEach((d, i) => {
+                            const x = getSX(d.t); const y = getSY(d.vwap + d.stdDev * m);
+                            if (x < SETTINGS.profW || x > cw - SETTINGS.domW) return;
+                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        });
+                        ctx.stroke();
+                        // Lower
+                        ctx.beginPath();
+                        vwapData.forEach((d, i) => {
+                            const x = getSX(d.t); const y = getSY(d.vwap - d.stdDev * m);
+                            if (x < SETTINGS.profW || x > cw - SETTINGS.domW) return;
+                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        });
+                        ctx.stroke();
+                    });
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+
+            // Liquidity Heatmap Rendering (Background)
+            if (SETTINGS.showHeat && heatMap.length > 0) {
+                heatMap.forEach((snap, idx) => {
+                    const x = getSX(snap.t); if (x < SETTINGS.profW || x > cw-SETTINGS.domW) return;
+                    const nextX = idx < heatMap.length - 1 ? getSX(heatMap[idx+1].t) : cw-SETTINGS.domW;
+                    const w = nextX - x; if (w <= 0) return;
+
+                    Object.keys(snap.b).forEach(p => {
+                        const y = getSY(+p); if (y < 0 || y > ch) return;
+                        const v = snap.b[p]; const alpha = Math.min(0.2, (v / orderBook.max) * 0.5);
+                        ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`; ctx.fillRect(x, y-rh/2, w, rh);
+                    });
+                    Object.keys(snap.a).forEach(p => {
+                        const y = getSY(+p); if (y < 0 || y > ch) return;
+                        const v = snap.a[p]; const alpha = Math.min(0.2, (v / orderBook.max) * 0.5);
+                        ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`; ctx.fillRect(x, y-rh/2, w, rh);
+                    });
+                });
+            }
+            if(isDrawing) {
+                ctx.strokeStyle = '#FFF'; ctx.setLineDash([2,2]);
+                if(activeTool === 'hline') { const y = getSY(startP); ctx.beginPath(); ctx.moveTo(SETTINGS.profW, y); ctx.lineTo(cw-SETTINGS.domW, y); ctx.stroke(); }
+                else if(activeTool === 'box' || activeTool === 'delta-prof' || activeTool === 'vol-prof' || activeTool === 'tpo' || activeTool === 'long' || activeTool === 'short' || activeTool === 'line') { 
+                    const y1 = getSY(startP), y2 = mouseY, x1 = getSX(startT), x2 = mouseX; 
+                    if (activeTool === 'line') { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+                    else ctx.strokeRect(x1, y1, x2-x1, y2-y1); 
+                }
+                ctx.setLineDash([]);
+            }
+
+            // Timeline Axis
+            tctx.fillStyle = '#090D14'; tctx.fillRect(0,0,tw/dpr,th/dpr);
+            tctx.fillStyle = '#94A3B8'; tctx.font = '10px Arial'; tctx.textAlign = 'center';
+            bars.forEach((b,i)=>{
+                const x = getSX(b.t); if(x < SETTINGS.profW || x > cw-SETTINGS.domW) return;
+                ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,ch); ctx.stroke();
+                if(i%5===0) tctx.fillText(new Date(b.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), x, 22);
+            });
+
+            // DOM (Right Order Book)
+            ctx.fillStyle = '#080C14'; ctx.fillRect(cw-SETTINGS.domW,0,SETTINGS.domW,ch);
+            const drawDOM = (data, color, isAsk) => {
+                const maxIntensity = orderBook.max || 1;
+                for (const pStr in data) {
+                    const p = +pStr;
+                    const y = getSY(p); if(y < -20 || y > ch+20) continue;
+                    const val = data[pStr];
+                    const intensity = val / maxIntensity;
+                    const rV = (Math.sqrt(val)/Math.sqrt(maxIntensity))*SETTINGS.domW * 0.9;
+                    const txt = val >= 1000000 ? (val/1000000).toFixed(1)+'M' : (val >= 1000 ? (val/1000).toFixed(1)+'K' : val.toFixed(0));
+                    
+                    // --- LIVE GLOWING WALLS ---
+                    if (intensity > 0.8 && SETTINGS.showGlowWalls) {
+                        ctx.fillStyle = isAsk ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+                        ctx.fillRect(SETTINGS.profW, y-rh/2, (cw-SETTINGS.domW)-SETTINGS.profW, rh);
+                        
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(SETTINGS.profW, y); ctx.lineTo(cw - SETTINGS.domW, y); ctx.stroke();
+
+                        // Label on the actual wall line
+                        ctx.fillStyle = '#FFFFFF'; ctx.font = 'bold 11px Roboto Mono'; ctx.textAlign = 'right';
+                        ctx.fillText(txt, cw - SETTINGS.domW - 5, y - 4);
+
+                        ctx.fillStyle = '#FFFFFF'; 
+                        ctx.fillRect(cw-rV, y-rh/2, rV, rh-0.5);
+                    } else if (intensity > 0.6 && SETTINGS.showGlowWalls) {
+                        ctx.fillStyle = isAsk ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)';
+                        ctx.fillRect(SETTINGS.profW, y-rh/2, (cw-SETTINGS.domW)-SETTINGS.profW, rh); 
+                        ctx.fillStyle = color; 
+                        ctx.fillRect(cw-rV, y-rh/2, rV, rh-0.5);
+                    } else {
+                        ctx.fillStyle = color; ctx.globalAlpha = intensity > 0.7 ? 1.0 : 0.7;
+                        ctx.fillRect(cw-rV, y-rh/2, rV, rh-0.5);
+                        ctx.globalAlpha = 1.0;
+                    }
+                    
+                    if(rh > 12) {
+                        ctx.fillStyle = (intensity > 0.8 && SETTINGS.showGlowWalls) ? '#000' : (intensity > 0.7 ? '#FFF' : '#94A3B8'); 
+                        ctx.font = intensity > 0.7 ? 'bold 10px monospace' : '9px monospace'; 
+                        ctx.textAlign = 'right';
+                        ctx.fillText(txt, cw-4, y+3);
+                    }
+                }
+            };
+            drawDOM(orderBook.b, THEME.up, false);
+            drawDOM(orderBook.a, THEME.dn, true);
+
+            // Footprint Clusters (CANDLE BODIES + VOLUME)
+            if (SETTINGS.chartType === 'line') {
+                ctx.strokeStyle = '#00FFFF';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                let first = true;
+                bars.forEach(b => {
+                    const x = getSX(b.t);
+                    const y = getSY(b.c);
+                    if (x < SETTINGS.profW || x > cw - SETTINGS.domW) return;
+                    if (first) { ctx.moveTo(x, y); first = false; }
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                
+                // Add glow to line
+                ctx.globalAlpha = 0.3;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+            }
+
+            bars.forEach((b,i)=>{
+                const x = getSX(b.t); if(x+bw/2 < SETTINGS.profW || x-bw/2 > cw-SETTINGS.domW) return;
+                const syH = getSY(b.h), syL = getSY(b.l), syO = getSY(b.o), syC = getSY(b.c);
+                const isUp = b.c >= b.o;
+                const color = isUp ? THEME.up : THEME.dn;
+
+                if (SETTINGS.chartType === 'candle') {
+                    // Body Background (Transparent)
+                    const bodyH = Math.max(1, Math.abs(syO - syC));
+                    ctx.fillStyle = color; ctx.globalAlpha = 0.12; 
+                    ctx.fillRect(x - bw/2, Math.min(syO, syC), bw, bodyH);
+                    ctx.globalAlpha = 1.0;
+                }
+
+                if (SETTINGS.chartType === 'candle') {
+                    // 3. Draw Volume Clusters & Imbalances
+                    const tick = SETTINGS.tick;
+                    const imbRatio = 3.0; // 300% imbalance ratio
+                    let buyImbs = [], sellImbs = [];
+
+                    for (const pStr in b.vAP) {
+                        const p = +pStr;
+                        const y = getSY(p); if(y < -rh || y > ch+rh) continue;
+                        const cluster = b.vAP[pStr];
+                        
+                        // Diagonal Imbalance Calculation (Always runs to support STK)
+                        const pBelow = Math.round((p - tick) / tick) * tick;
+                        const clusterBelow = b.vAP[pBelow];
+                        if (clusterBelow) {
+                            if (cluster.b > clusterBelow.s * imbRatio && cluster.b > 10) buyImbs.push(p);
+                            if (clusterBelow.s > cluster.b * imbRatio && clusterBelow.s > 10) sellImbs.push(pBelow);
+                        }
+
+                        const localIntensit = cluster.t / b.max;
+                        ctx.fillStyle = `rgba(${THEME.vBase}, ${0.1 + localIntensit * 0.8})`; 
+                        ctx.fillRect(x-bw/2, y-rh/2, bw, rh-0.5);
+
+                        if(p === b.p) { 
+                            ctx.strokeStyle = '#2962FF'; ctx.lineWidth=2; ctx.strokeRect(x-bw/2+0.5, y-rh/2+0.5, bw-1, rh-1); 
+                        }
+                        
+                        if(bw > 30 && rh > 14) { 
+                            if (SETTINGS.showFootprint && bw > 60) {
+                                const bVal = cluster.s >= 1000 ? (cluster.s/1000).toFixed(1)+'k' : cluster.s.toFixed(0);
+                                const sVal = cluster.b >= 1000 ? (cluster.b/1000).toFixed(1)+'k' : cluster.b.toFixed(0);
+                                ctx.font = 'bold 10px monospace';
+                                
+                                // Highlight IMB in Footprint (Only if showImb is ON)
+                                const isBuyImb = buyImbs.includes(p);
+                                const isSellImb = sellImbs.includes(p);
+
+                                if (SETTINGS.showImb) {
+                                    if (isSellImb) {
+                                        ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                                        ctx.fillRect(x - bw/2, y - rh/2, bw/2, rh-0.5);
+                                    }
+                                    if (isBuyImb) {
+                                        ctx.fillStyle = 'rgba(16, 185, 129, 0.4)';
+                                        ctx.fillRect(x, y - rh/2, bw/2, rh-0.5);
+                                    }
+                                }
+
+                                ctx.fillStyle = (SETTINGS.showImb && isSellImb) ? '#FFF' : '#EF4444'; ctx.textAlign = 'right'; ctx.fillText(bVal, x - 3, y + 4);
+                                ctx.fillStyle = (SETTINGS.showImb && isBuyImb) ? '#FFF' : '#10B981'; ctx.textAlign = 'left'; ctx.fillText(sVal, x + 3, y + 4);
+                            } else {
+                                ctx.fillStyle = localIntensit > 0.7 ? '#FFF' : '#94A3B8'; 
+                                ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center'; 
+                                const txt = cluster.t >= 1000 ? (cluster.t/1000).toFixed(1)+'k' : cluster.t.toFixed(0);
+                                ctx.fillText(txt, x, y + 4); 
+                            }
+                        }
+                    }
+
+                    // 4. STACKED IMBALANCES (Draw Boxes with Mitigation)
+                    if (SETTINGS.showStk) {
+                        const findStacked = (prices) => {
+                            if (prices.length < 3) return [];
+                            prices.sort((a,b) => a-b);
+                            let zones = [], current = [prices[0]];
+                            for (let j=1; j<prices.length; j++) {
+                                if (Math.abs(prices[j] - prices[j-1] - tick) < tick*0.1) current.push(prices[j]);
+                                else { if (current.length >= 3) zones.push(current); current = [prices[j]]; }
+                            }
+                            if (current.length >= 3) zones.push(current);
+                            return zones;
+                        };
+
+                        const bZones = findStacked(buyImbs);
+                        const sZones = findStacked(sellImbs);
+
+                        const drawZone = (z, isBuy) => {
+                            const zMin = z[0], zMax = z[z.length-1];
+                            const yTop = getSY(zMax), yBot = getSY(zMin);
+                            
+                            // Mitigation logic: find first bar that touches the zone
+                            let endX = cw - SETTINGS.domW;
+                            for (let j = i + 1; j < bars.length; j++) {
+                                const nextB = bars[j];
+                                const nx = getSX(nextB.t);
+                                if (isBuy) {
+                                    if (nextB.l <= zMax) { endX = nx; break; }
+                                } else {
+                                    if (nextB.h >= zMin) { endX = nx; break; }
+                                }
+                            }
+
+                            ctx.fillStyle = isBuy ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+                            ctx.fillRect(x - bw/2, yTop - rh/2, endX - (x - bw/2), yBot - yTop + rh);
+                            
+                            // Only draw border if it's unmitigated (extends to current price)
+                            if (endX >= cw - SETTINGS.domW - 5) {
+                                ctx.strokeStyle = isBuy ? '#10B981' : '#EF4444';
+                                ctx.lineWidth = 1;
+                                ctx.strokeRect(x - bw/2, yTop - rh/2, endX - (x - bw/2), yBot - yTop + rh);
+                            }
+                        };
+
+                        bZones.forEach(z => drawZone(z, true));
+                        sZones.forEach(z => drawZone(z, false));
+                    }
+
+                    // 5. Draw Body Border & Wicks
+                    const bodyH = Math.max(1, Math.abs(syO - syC));
+                    ctx.strokeStyle = color; 
+                    ctx.lineWidth = 2; 
+                    ctx.beginPath(); ctx.moveTo(x, syH); ctx.lineTo(x, syL); ctx.stroke();
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeRect(x - bw/2, Math.min(syO, syC), bw, bodyH);
+                }
+
+                // 4. Delta Label
+            });
+
+            // 4. Delta Labels (Final Pass to stay on top)
+            if (SETTINGS.showDelta && SETTINGS.chartType === 'candle') {
+                bars.forEach(b => {
+                    const x = getSX(b.t); if(x + bw/2 < SETTINGS.profW || x - bw/2 > cw-SETTINGS.domW) return;
+                    const delta = b.buys - b.sells;
+                    if (delta === 0) return;
+                    
+                    // Find the absolute highest Y (lowest coordinate) between candle high and footprint clusters
+                    let topP = b.h;
+                    for (let p in b.vAP) { if (+p > topP) topP = +p; }
+                    
+                    const syTop = getSY(topP);
+                    const deltaStr = (delta > 0 ? '+' : '') + (Math.abs(delta) >= 1000 ? (delta / 1000).toFixed(1) + 'k' : delta.toFixed(0));
+                    ctx.font = 'bold 12px Roboto Mono';
+                    const tw = ctx.measureText(deltaStr).width;
+                    const deltaY = syTop - rh/2 - 25;
+
+                    ctx.fillStyle = '#070B14';
+                    ctx.fillRect(x - tw/2 - 5, deltaY - 12, tw + 10, 16);
+                    ctx.strokeStyle = delta > 0 ? THEME.up : THEME.dn;
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(x - tw/2 - 5, deltaY - 12, tw + 10, 16);
+                    
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = delta > 0 ? THEME.up : THEME.dn;
+                    ctx.fillText(deltaStr, x, deltaY + 2);
+                });
+            }
+
+            // 5. WHALE BUBBLES — Removed from main chart as requested
+            // Bubbles will only appear within the Delta Profile drawing area.
+
+            // --- VOLUME BARS (TradingView Style) ---
+            const volH = ch * 0.15; // Max 15% of chart height — shared by VOL + CVD
+            if (SETTINGS.showVol && bars.length > 0) {
+                const visibleBars = bars.filter(b => {
+                    const x = getSX(b.t); return x > SETTINGS.profW - 20 && x < cw - SETTINGS.domW + 20;
+                });
+                if (visibleBars.length > 0) {
+                    const maxV = Math.max(...visibleBars.map(b => b.v));
+                    visibleBars.forEach(b => {
+                        const x = getSX(b.t);
+                        const hVal = (b.v / (maxV || 1)) * volH;
+                        ctx.fillStyle = b.c >= b.o ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                        ctx.fillRect(x - bw/2, ch - hVal, bw, hVal);
+                    });
+                }
+            }
+
+            // --- CVD LINE (Cumulative Volume Delta) ---
+            if (SETTINGS.showCVD && bars.length > 0) {
+                const visibleBars = bars.filter(b => {
+                    const x = getSX(b.t); return x > SETTINGS.profW - 20 && x < cw - SETTINGS.domW + 20;
+                });
+                if (visibleBars.length > 1) {
+                    // Build cumulative delta from the first visible bar
+                    let cvdVals = [];
+                    let running = 0;
+                    visibleBars.forEach(b => {
+                        running += (b.buys - b.sells);
+                        cvdVals.push({ t: b.t, cvd: running });
+                    });
+                    const minCVD = Math.min(...cvdVals.map(v => v.cvd));
+                    const maxCVD = Math.max(...cvdVals.map(v => v.cvd));
+                    const rangeCVD = maxCVD - minCVD || 1;
+                    // Draw zero baseline in the vol zone
+                    const zeroY = ch - volH * ((0 - minCVD) / rangeCVD);
+                    ctx.strokeStyle = 'rgba(255, 165, 0, 0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 4]);
+                    ctx.beginPath(); ctx.moveTo(SETTINGS.profW, zeroY); ctx.lineTo(cw - SETTINGS.domW, zeroY); ctx.stroke();
+                    ctx.setLineDash([]);
+                    // CVD line
+                    ctx.strokeStyle = '#FFA500';
+                    ctx.lineWidth = 1.5;
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = 'rgba(255,165,0,0.5)';
+                    ctx.beginPath();
+                    cvdVals.forEach((v, i) => {
+                        const x = getSX(v.t);
+                        const y = ch - volH * ((v.cvd - minCVD) / rangeCVD);
+                        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                    // Label: current CVD value
+                    const lastCVD = cvdVals[cvdVals.length - 1];
+                    const lastX = getSX(lastCVD.t);
+                    const lastY = ch - volH * ((lastCVD.cvd - minCVD) / rangeCVD);
+                    const cvdLabel = lastCVD.cvd >= 1000 ? (lastCVD.cvd/1000).toFixed(1)+'K' : (lastCVD.cvd <= -1000 ? (lastCVD.cvd/1000).toFixed(1)+'K' : lastCVD.cvd.toFixed(0));
+                    ctx.fillStyle = '#FFA500';
+                    ctx.font = 'bold 9px Roboto Mono';
+                    ctx.textAlign = 'left';
+                    ctx.fillText('CVD ' + cvdLabel, SETTINGS.profW + 4, ch - volH + 12);
+                }
+            }
+
+            // Crosshair
+            if(mouseX > SETTINGS.profW && mouseX < cw-SETTINGS.domW) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.setLineDash([5,5]);
+                ctx.beginPath(); ctx.moveTo(mouseX, 0); ctx.lineTo(mouseX, ch); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, mouseY); ctx.lineTo(cw, mouseY); ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // Scale
+            sctx.fillStyle = '#0A0F17'; sctx.fillRect(0,0,sw/dpr,sh/dpr); sctx.fillStyle = '#94A3B8'; sctx.font = '10px monospace';
+            for(let p=sPr; p<=ePr; p+=SETTINGS.tick*10) { const y = getSY(p); if(y>0 && y<sh/dpr) sctx.fillText(p.toFixed(SETTINGS.tick < 0.01 ? 4 : 1),5,y+3); }
+
+
+            // Crosshair
+            if(mouseX > 0 && mouseX < cw-SETTINGS.domW) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.setLineDash([5,5]);
+                ctx.beginPath(); ctx.moveTo(mouseX, 0); ctx.lineTo(mouseX, ch); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(SETTINGS.profW, mouseY); ctx.lineTo(cw-SETTINGS.domW, mouseY); ctx.stroke(); ctx.setLineDash([]);
+            }
+
+            // Scale
+            sctx.fillStyle = '#0A0F17'; sctx.fillRect(0,0,sw/dpr,sh/dpr); sctx.fillStyle = '#94A3B8'; sctx.font = '10px monospace';
+            for(let p=sPr; p<=ePr; p+=SETTINGS.tick*10) { const y = getSY(p); if(y>0 && y<sh/dpr) sctx.fillText(p.toFixed(SETTINGS.tick < 0.01 ? 4 : 1),5,y+3); }
+
+            updateBadgeOnly(); 
+            
+            // Toggle Panels
+            const statsPanel = document.getElementById('stats-panel-wrap');
+            if (statsPanel) {
+                const isShowing = SETTINGS.showStatsTable;
+                if (statsPanel.style.display !== (isShowing ? 'flex' : 'none')) {
+                    statsPanel.style.display = isShowing ? 'flex' : 'none';
+                    resize();
+                }
+                if (isShowing) drawStatsTable();
+            }
+
+            // Frame throttling for mobile to save CPU/Battery
+            if (window.innerWidth < 768) {
+                setTimeout(() => requestAnimationFrame(loop), 50); // ~20 FPS on mobile
+            } else {
+                requestAnimationFrame(loop);
+            }
+        }
+
+
+
+        // --- ATAS Mouse Control System ---
+        let dragM = 0, lx, ly; 
+        window.onmousedown = e => {
+            lx = e.clientX; ly = e.clientY;
+            const rect = mainC.getBoundingClientRect(); mouseX = e.clientX - rect.left; mouseY = e.clientY - rect.top;
+            
+            if(activeTool !== 'cursor' && e.target === mainC) {
+                isDrawing = true; startP = getP(mouseY); startT = getT(mouseX);
+                if(activeTool === 'hline') { drawings.push({type:'h-line', p:startP, color:THEME.cyn}); isDrawing = false; }
+                return;
+            }
+
+            if(e.target === mainC) {
+                if (activeTool === 'cursor') {
+                    const mx = mouseX, my = mouseY;
+                    let found = false;
+                    
+                    // Prioritize handles if something is already selected
+                    if (selectedDrawing) {
+                        if (selectedDrawing.type === 'long' || selectedDrawing.type === 'short') {
+                            const yE = getSY(selectedDrawing.entry), yT = getSY(selectedDrawing.target), yS = getSY(selectedDrawing.stop);
+                            const x1 = getSX(selectedDrawing.t1), x2 = getSX(selectedDrawing.t2), xc = x1 + (x2-x1)/2;
+                            if (Math.abs(mx - xc) < 20) {
+                                if (Math.abs(my - yE) < 10) { selectedHandle = 'entry'; found = true; }
+                                else if (Math.abs(my - yT) < 10) { selectedHandle = 'target'; found = true; }
+                                else if (Math.abs(my - yS) < 10) { selectedHandle = 'stop'; found = true; }
+                            }
+                            if (!found && Math.abs(my - yE) < 20) {
+                                if (Math.abs(mx - x1) < 10) { selectedHandle = 't1'; found = true; }
+                                else if (Math.abs(mx - x2) < 10) { selectedHandle = 't2'; found = true; }
+                            }
+                        } else if (selectedDrawing.type === 'line') {
+                            const x1 = getSX(selectedDrawing.t1), y1 = getSY(selectedDrawing.p1), x2 = getSX(selectedDrawing.t2), y2 = getSY(selectedDrawing.p2);
+                            if (Math.hypot(mx-x1, my-y1) < 12) { selectedHandle = 'h1'; found = true; }
+                            else if (Math.hypot(mx-x2, my-y2) < 12) { selectedHandle = 'h2'; found = true; }
+                        }
+                    }
+
+                    const ds = document.getElementById('drawing-settings');
+                    const isClickOnDS = ds.contains(e.target);
+                    
+                    if (!isClickOnDS && !found) {
+                        const prevSelected = selectedDrawing;
+                        selectedDrawing = null; selectedHandle = null;
+                        ds.style.display = 'none';
+                        ds.removeAttribute('data-manual-pos');
+                        
+                        let hits = [];
+                        const cw = w/dpr;
+
+                        // Search backwards (topmost first)
+                        for (let i = drawings.length - 1; i >= 0; i--) {
+                            const d = drawings[i];
+                            let isHit = false;
+
+                            if (d.type === 'long' || d.type === 'short') {
+                                const yE = getSY(d.entry), yT = getSY(d.target), yS = getSY(d.stop);
+                                const x1 = getSX(d.t1), x2 = getSX(d.t2);
+                                if (mx >= Math.min(x1, x2) && mx <= Math.max(x1, x2) && my >= Math.min(yE, yT, yS) && my <= Math.max(yE, yT, yS)) isHit = true;
+                            } else if (d.type === 'line') {
+                                const x1 = getSX(d.t1), y1 = getSY(d.p1), x2 = getSX(d.t2), y2 = getSY(d.p2);
+                                if (distToSegment(mx, my, x1, y1, x2, y2) < 15) isHit = true;
+                            } else if (d.type === 'h-line') {
+                                if (Math.abs(my - getSY(d.p)) < 12) isHit = true;
+                            } else if (d.type === 'box' || d.type === 'delta-profile' || d.type === 'volume-profile' || d.type === 'tpo-profile') {
+                                const x1 = getSX(d.t1), x2 = getSX(d.t2);
+                                const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+                                
+                                const pMin = d.lastMinP || Math.min(d.p1, d.p2);
+                                const pMax = d.lastMaxP || Math.max(d.p1, d.p2);
+                                const yTop = getSY(pMax), yBot = getSY(pMin);
+                                const minY = Math.min(yTop, yBot), maxY = Math.max(yTop, yBot);
+
+                                if (my >= minY - 5 && my <= maxY + 5) {
+                                    // Hit if clicking inside the time range
+                                    if (mx >= minX - 10 && mx <= maxX + 10) isHit = true;
+                                    // Or clicking the immediate vicinity of the profile start
+                                    else if (Math.abs(mx - minX) < 20) isHit = true;
+                                }
+                            }
+                            if (isHit) hits.push(d);
+                        }
+
+                        if (hits.length > 0) {
+                            let nextIdx = 0;
+                            if (prevSelected && hits.includes(prevSelected)) {
+                                nextIdx = (hits.indexOf(prevSelected) + 1) % hits.length;
+                            }
+                            selectedDrawing = hits[nextIdx];
+                            found = true;
+                        }
+                    }
+                    
+                    if (selectedDrawing) {
+                        const ds = document.getElementById('drawing-settings');
+                        ds.style.display = 'flex';
+                        
+                        // Update inputs to match selected drawing
+                        const colorInput = document.getElementById('drawing-color-input');
+                        const opacityInput = document.getElementById('drawing-opacity-input');
+                        if (colorInput) colorInput.value = selectedDrawing.color || '#8A2BE2';
+                        if (opacityInput) opacityInput.value = selectedDrawing.opacity ?? 0.2;
+
+                        if (selectedHandle) { dragM = 0; return; }
+                    }
+                }
+                
+                // Only enable chart drag if we're not interacting with settings buttons
+                const ds = document.getElementById('drawing-settings');
+                if (!ds.contains(e.target)) {
+                    dragM = 1;
+                }
+            }
+            else if(e.target.parentElement?.id === 'scale-right') dragM = 2;
+            else if(e.target.parentElement?.id === 'bottom-axis') dragM = 3;
+        };
+        let selectedDrawing = null, selectedHandle = null;
+        window.onmousemove = e => {
+            const rect = mainC.getBoundingClientRect(); mouseX = e.clientX - rect.left; mouseY = e.clientY - rect.top;
+            if(isDrawing) return;
+            if (selectedDrawing && selectedHandle) {
+                if (selectedHandle === 'entry' || selectedHandle === 'target' || selectedHandle === 'stop') {
+                    const p = getP(mouseY);
+                    if (selectedHandle === 'entry') selectedDrawing.entry = p;
+                    else if (selectedHandle === 'target') selectedDrawing.target = p;
+                    else if (selectedHandle === 'stop') selectedDrawing.stop = p;
+                } else if (selectedHandle === 't1' || selectedHandle === 't2') {
+                    const t = getT(mouseX);
+                    if (selectedHandle === 't1') selectedDrawing.t1 = t;
+                    else if (selectedHandle === 't2') selectedDrawing.t2 = t;
+                } else if (selectedHandle === 'h1' || selectedHandle === 'h2') {
+                    const t = getT(mouseX), p = getP(mouseY);
+                    if (selectedHandle === 'h1') { selectedDrawing.t1 = t; selectedDrawing.p1 = p; }
+                    else if (selectedHandle === 'h2') { selectedDrawing.t2 = t; selectedDrawing.p2 = p; }
+                }
+            }
+            if (selectedDrawing) {
+                const ds = document.getElementById('drawing-settings');
+                if (ds.getAttribute('data-manual-pos') !== 'true') {
+                    const rect = mainC.getBoundingClientRect();
+                    let sx, sy;
+                    if (selectedDrawing.type === 'h-line') { sx = mouseX; sy = getSY(selectedDrawing.p); }
+                    else if (selectedDrawing.type === 'line') { sx = (getSX(selectedDrawing.t1) + getSX(selectedDrawing.t2))/2; sy = (getSY(selectedDrawing.p1) + getSY(selectedDrawing.p2))/2; }
+                    else if (selectedDrawing.type === 'long' || selectedDrawing.type === 'short') { sx = (getSX(selectedDrawing.t1) + getSX(selectedDrawing.t2))/2; sy = getSY(selectedDrawing.entry); }
+                    else { sx = (getSX(selectedDrawing.t1) + getSX(selectedDrawing.t2))/2; sy = Math.min(getSY(selectedDrawing.p1), getSY(selectedDrawing.p2)); }
+                    
+                    ds.style.left = (rect.left + sx - 30) + 'px';
+                    ds.style.top = (rect.top + sy - 45) + 'px';
+                }
+            }
+            if(!dragM || !STATES[SETTINGS.symbol]) return;
+            // Safety: if mouse buttons are not pressed, reset drag state
+            if (e.buttons === 0) { dragM = 0; isDrawing = false; return; }
+
+            const s = STATES[SETTINGS.symbol];
+            const dx = e.clientX - lx, dy = e.clientY - ly;
+            if(dragM === 1) { 
+                const zY = Math.max(0.01, s.zoomY);
+                s.scrollX += dx; 
+                s.scrollY += dy * (SETTINGS.tick/(SETTINGS.rowH * zY)); 
+            }
+            else if(dragM === 2) { 
+                s.zoomY *= (1 + dy/200); 
+                s.zoomY = Math.max(0.005, Math.min(800, s.zoomY));
+            }
+            else if(dragM === 3) { 
+                s.zoomX *= (1 - dx/200); 
+                s.zoomX = Math.max(0.005, Math.min(800, s.zoomX));
+            }
+            lx = e.clientX; ly = e.clientY;
+        };
+        window.onmouseup = () => {
+            selectedHandle = null;
+            if(isDrawing) {
+                const endP = getP(mouseY), endT = getT(mouseX);
+                if (activeTool === 'box') {
+                    drawings.push({type:'box', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.tpo, opacity: 0.2});
+                } else if (activeTool === 'delta-prof') {
+                    drawings.push({type:'delta-profile', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.cyn, isLive: true});
+                } else if (activeTool === 'vol-prof') {
+                    drawings.push({
+                        type: 'volume-profile', p1: startP, t1: startT, p2: endP, t2: endT, color: '#2962FF', isLive: true,
+                        ...DEFAULT_FRVP_SETTINGS
+                    });
+                } else if (activeTool === 'tpo') {
+                    drawings.push({type:'tpo-profile', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.up, isLive: true});
+                } else if (activeTool === 'long' || activeTool === 'short') {
+                    const isLong = activeTool === 'long';
+                    const target = endP;
+                    const stop = startP - (target - startP) * 0.5; // Default 1:2 RR
+                    drawings.push({
+                        type: activeTool, entry: startP, target: target, stop: stop,
+                        t1: startT, t2: endT
+                    });
+                } else if (activeTool === 'line') {
+                    drawings.push({ type: 'line', p1: startP, t1: startT, p2: endP, t2: endT });
+                }
+            }
+            dragM = 0; isDrawing = false;
+        };
+        window.onwheel = e => {
+            e.preventDefault();
+            const s = STATES[SETTINGS.symbol]; if(!s) return;
+            const rect = mainC.getBoundingClientRect(); const mX = e.clientX - rect.left; const mY = e.clientY - rect.top;
+            const mousePrice = getP(mY);
+            
+            // Use exponential zoom for a more natural feel that never reaches zero/negative
+            const zoomFactor = Math.exp(-e.deltaY / 800);
+
+            if(e.ctrlKey) { 
+                s.zoomY *= zoomFactor; 
+                s.zoomY = Math.max(0.005, Math.min(800, s.zoomY));
+                s.scrollY = mousePrice - ((h/dpr)/2 - mY) / (SETTINGS.rowH * s.zoomY / SETTINGS.tick); 
+            } 
+            else if(e.shiftKey) s.scrollX -= e.deltaY; 
+            else if(e.altKey) s.scrollY += e.deltaY * (SETTINGS.tick/5);
+            else {
+                s.zoomX *= zoomFactor;
+                s.zoomX = Math.max(0.005, Math.min(800, s.zoomX));
+            }
+        };
+        
+        // --- Inputs & Smart Presets ---
+        document.getElementById('symbol-input').onkeydown = e => { if(e.key === 'Enter') init(e.target.value, null); };
+        document.getElementById('tick-input').onkeydown = e => { if(e.key === 'Enter') { SETTINGS.autoTick = false; document.getElementById('auto-tick-btn').classList.remove('active'); SETTINGS.tick = parseFloat(e.target.value); init(SETTINGS.symbol, SETTINGS.tick); } };
+        document.getElementById('auto-tick-btn').onclick = () => { SETTINGS.autoTick = !SETTINGS.autoTick; if(SETTINGS.autoTick) { calculateAutoTick(); init(SETTINGS.symbol, SETTINGS.tick); } else document.getElementById('auto-tick-btn').classList.remove('active'); };
+        document.getElementById('density-select').onchange = e => { if(e.target.value) { SETTINGS.autoTick = false; document.getElementById('auto-tick-btn').classList.remove('active'); SETTINGS.tick = parseFloat(e.target.value); init(SETTINGS.symbol, SETTINGS.tick); } };
+        document.getElementById('tf-select').onchange = e => {
+            SETTINGS.tf = e.target.value;
+            const map = { '1m':60000, '5m':300000, '15m':900000, '1h':3600000, '2h':7200000, '4h':14400000, '1d':86400000 };
+            SETTINGS.tfMs = map[e.target.value];
+            // Clear stacked zones on TF change as they are timeframe-specific
+            SETTINGS.stackedZones = [];
+            init(SETTINGS.symbol, SETTINGS.tick);
+        };
+
+        // --- Drawing Toolbar Listeners ---
+        const tools = ['cursor','hline','line','box','long','short','delta-prof','vol-prof','undo','clear'];
+        tools.forEach(t => {
+            const el = document.getElementById('tool-'+t);
+            if(!el) return;
+            el.onclick = () => {
+                if(t === 'clear') { drawings = []; document.getElementById('drawing-settings').style.display = 'none'; selectedDrawing = null; return; }
+                if(t === 'undo') { drawings.pop(); document.getElementById('drawing-settings').style.display = 'none'; selectedDrawing = null; return; }
+                activeTool = t;
+                document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
+                
+                // Clear selection when switching tools
+                selectedDrawing = null;
+                const ds = document.getElementById('drawing-settings');
+                if(ds) ds.style.display = 'none';
+            };
+        });
+
+        document.getElementById('del-drawing-btn').onclick = () => {
+            if (selectedDrawing) {
+                drawings = drawings.filter(d => d !== selectedDrawing);
+                selectedDrawing = null;
+                document.getElementById('drawing-settings').style.display = 'none';
+            }
+        };
+
+        // FRVP Settings Logic
+        window.closeFrvpSettings = () => {
+            document.getElementById('frvp-settings-modal').style.display = 'none';
+        };
+        window.saveFrvpSettings = () => {
+            const settings = {
+                rowsLayout: document.getElementById('frvp-rows-layout').value,
+                rowSize: parseFloat(document.getElementById('frvp-row-size').value),
+                volumeMode: document.getElementById('frvp-volume-mode').value,
+                vaVolume: parseFloat(document.getElementById('frvp-va-volume').value),
+                extendRight: document.getElementById('frvp-extend-right').checked
+            };
+            
+            // Save as global default for future drawings
+            DEFAULT_FRVP_SETTINGS = { ...settings };
+            
+            // Apply to selected drawing
+            if (selectedDrawing && selectedDrawing.type === 'volume-profile') {
+                Object.assign(selectedDrawing, settings);
+            }
+            closeFrvpSettings();
+        };
+
+        document.getElementById('settings-drawing-btn').onclick = () => {
+            if (selectedDrawing && selectedDrawing.type === 'volume-profile') {
+                document.getElementById('frvp-settings-modal').style.display = 'flex';
+                document.getElementById('frvp-rows-layout').value = selectedDrawing.rowsLayout || 'number';
+                document.getElementById('frvp-row-size').value = selectedDrawing.rowSize || 150;
+                document.getElementById('frvp-volume-mode').value = selectedDrawing.volumeMode || 'total';
+                document.getElementById('frvp-va-volume').value = selectedDrawing.vaVolume || 70;
+                document.getElementById('frvp-extend-right').checked = selectedDrawing.extendRight || false;
+            }
+        };
+
+        // Drawing Settings Listeners
+        document.getElementById('drawing-color-input').oninput = e => {
+            if (selectedDrawing) selectedDrawing.color = e.target.value;
+        };
+        document.getElementById('drawing-opacity-input').oninput = e => {
+            if (selectedDrawing) selectedDrawing.opacity = parseFloat(e.target.value);
+        };
+
+        // Floating Toolbar Dragging
+        let isDraggingSettings = false, settingsX, settingsY;
+        const ds = document.getElementById('drawing-settings');
+        document.getElementById('drag-handle').onmousedown = e => {
+            isDraggingSettings = true;
+            settingsX = e.clientX - ds.offsetLeft;
+            settingsY = e.clientY - ds.offsetTop;
+            e.stopPropagation();
+        };
+        window.addEventListener('mousemove', e => {
+            if (isDraggingSettings) {
+                ds.style.left = (e.clientX - settingsX) + 'px';
+                ds.style.top = (e.clientY - settingsY) + 'px';
+                ds.setAttribute('data-manual-pos', 'true');
+            }
+        });
+        window.addEventListener('mouseup', () => { isDraggingSettings = false; });
+
+        function distToSegment(px, py, x1, y1, x2, y2) {
+            const l2 = Math.pow(x1-x2, 2) + Math.pow(y1-y2, 2);
+            if (l2 === 0) return Math.hypot(px-x1, py-y1);
+            let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+        }
+
+        // Add tool listener for TPO explicitly
+        const tpoEl = document.getElementById('tool-tpo');
+        if (tpoEl) {
+            tpoEl.onclick = () => {
+                activeTool = 'tpo';
+                document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+                tpoEl.classList.add('active');
+            };
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.ctrlKey && e.key === 'z') { drawings.pop(); e.preventDefault(); }
+        });
+
+        // --- Order Flow Tool Logic ---
+        document.getElementById('imb-btn').onclick = e => { SETTINGS.showImb = !SETTINGS.showImb; e.target.classList.toggle('active'); };
+        document.getElementById('stk-btn').onclick = e => { SETTINGS.showStk = !SETTINGS.showStk; e.target.classList.toggle('active'); };
+        document.getElementById('heat-btn').onclick = e => { SETTINGS.showHeat = !SETTINGS.showHeat; e.target.classList.toggle('active'); };
+        document.getElementById('delta-btn').onclick = e => { SETTINGS.showDelta = !SETTINGS.showDelta; e.target.classList.toggle('active'); };
+        document.getElementById('whale-btn').onclick = e => { SETTINGS.showWhale = !SETTINGS.showWhale; e.target.classList.toggle('active'); };
+        document.getElementById('vwap-btn').onclick = e => { SETTINGS.showVWAP = !SETTINGS.showVWAP; e.target.classList.toggle('active'); };
+        document.getElementById('vol-btn').onclick = e => { SETTINGS.showVol = !SETTINGS.showVol; e.target.classList.toggle('active'); };
+        document.getElementById('day-open-btn').onclick = e => { SETTINGS.showDayOpen = !SETTINGS.showDayOpen; e.target.classList.toggle('active'); };
+        document.getElementById('daily-tpo-btn').onclick = e => { SETTINGS.showDailyTPO = !SETTINGS.showDailyTPO; e.target.classList.toggle('active'); };
+        document.getElementById('daily-vp-btn').onclick = e => { SETTINGS.showDailyVP = !SETTINGS.showDailyVP; e.target.classList.toggle('active'); };
+        document.getElementById('cvd-btn').onclick = e => { SETTINGS.showCVD = !SETTINGS.showCVD; e.target.classList.toggle('active'); };
+        document.getElementById('glow-btn').onclick = e => { SETTINGS.showGlowWalls = !SETTINGS.showGlowWalls; e.target.classList.toggle('active'); };
+        document.getElementById('foot-btn').onclick = e => { SETTINGS.showFootprint = !SETTINGS.showFootprint; e.target.classList.toggle('active'); };
+        document.getElementById('stats-table-btn').onclick = e => { SETTINGS.showStatsTable = !SETTINGS.showStatsTable; e.target.classList.toggle('active'); };
+        document.getElementById('chart-type-btn').onclick = e => {
+            SETTINGS.chartType = SETTINGS.chartType === 'candle' ? 'line' : 'candle';
+            e.target.innerText = SETTINGS.chartType.toUpperCase();
+            e.target.classList.toggle('active', SETTINGS.chartType === 'line');
+        };
+        document.getElementById('snr-btn').onclick = e => { SETTINGS.showSNR = !SETTINGS.showSNR; e.target.classList.toggle('active'); };
+        document.getElementById('sk-btn').onclick = e => { SETTINGS.showSK = !SETTINGS.showSK; e.target.classList.toggle('active'); };
+        document.getElementById('smc-btn').onclick = e => { SETTINGS.showSMC = !SETTINGS.showSMC; e.target.classList.toggle('active'); };
+        document.getElementById('crt-btn').onclick = e => { SETTINGS.showCRT = !SETTINGS.showCRT; e.target.classList.toggle('active'); };
+        // Indicators disabled for mobile performance optimization
+        /*
+        document.getElementById('stats-btn').onclick = e => { SETTINGS.showStats = !SETTINGS.showStats; e.target.classList.toggle('active'); };
+        document.getElementById('oi-btn').onclick = e => { SETTINGS.showOI = !SETTINGS.showOI; e.target.classList.toggle('active'); };
+        document.getElementById('cvd-btn').onclick = e => { SETTINGS.showCVD = !SETTINGS.showCVD; e.target.classList.toggle('active'); };
+        document.getElementById('doi-btn').onclick = e => { SETTINGS.showDOI = !SETTINGS.showDOI; e.target.classList.toggle('active'); };
+        document.getElementById('liq-btn').onclick = e => { SETTINGS.showLiq = !SETTINGS.showLiq; e.target.classList.toggle('active'); };
+        document.getElementById('trend-btn').onclick = e => { SETTINGS.showTrend = !SETTINGS.showTrend; e.target.classList.toggle('active'); };
+        document.getElementById('tindex-btn').onclick = e => { SETTINGS.showTIndex = !SETTINGS.showTIndex; e.target.classList.toggle('active'); };
+        document.getElementById('oit-btn').onclick = e => {
+            SETTINGS.showOIPanel = !SETTINGS.showOIPanel;
+            e.target.classList.toggle('active');
+            document.getElementById('oi-panel-wrap').style.display = SETTINGS.showOIPanel ? '' : 'none';
+            document.getElementById('oi-resizer').style.display = SETTINGS.showOIPanel ? '' : 'none';
+            resize();
+        };
+        document.getElementById('vspd-btn').onclick = e => {
+            SETTINGS.showVSpdPanel = !SETTINGS.showVSpdPanel;
+            e.target.classList.toggle('active');
+            document.getElementById('vspd-panel-wrap').style.display = SETTINGS.showVSpdPanel ? '' : 'none';
+            document.getElementById('vspd-resizer').style.display = SETTINGS.showVSpdPanel ? '' : 'none';
+            resize();
+        };
+        document.getElementById('theat-btn').onclick = e => {
+            SETTINGS.showTFHeatmap = !SETTINGS.showTFHeatmap;
+            e.target.classList.toggle('active');
+        };
+        */
+
+        function jumpToTime(targetT) {
+            const s = STATES[SETTINGS.symbol]; if(!s || !s.bars.length) return;
+            // Find bar closest to targetT
+            let closest = s.bars[0];
+            let minDist = Math.abs(s.bars[0].t - targetT);
+            s.bars.forEach(b => {
+                const dist = Math.abs(b.t - targetT);
+                if(dist < minDist) { minDist = dist; closest = b; }
+            });
+            
+            // Adjust scrollX so this bar is centered/right
+            const now = s.bars[s.bars.length-1].t;
+            const barOffset = (now - closest.t) / SETTINGS.tfMs;
+            const barWidth = (SETTINGS.pxMin * s.zoomX);
+            
+            // Equation from getSX: x = (w/dpr) - domW - 60 - ((now - t)/tfMs) * barWidth + scrollX
+            // We want x = (w/dpr) / 2 (center)
+            s.scrollX = (w/dpr)/2 - ((w/dpr) - SETTINGS.domW - 60 - (barOffset * barWidth));
+            s.scrollY = closest.c; // Jump price too
+        }
+
+        document.getElementById('jump-24h-btn').onclick = () => {
+             const target = Date.now() - (24 * 60 * 60 * 1000);
+             jumpToTime(target);
+        };
+
+        document.getElementById('go-live-btn').onclick = () => {
+            const s = STATES[SETTINGS.symbol]; if(!s) return;
+            s.scrollX = 0;
+            s.scrollY = s.lastP;
+        };
+
+        document.getElementById('whale-thres-input').onkeydown = e => { if(e.key === 'Enter') SETTINGS.whaleThres = parseFloat(e.target.value); };
+
+        function drawStatsTable() {
+            const state = STATES[SETTINGS.symbol];
+            if (!state || !state.bars.length) return;
+            const { bars, zoomX, scrollX } = state;
+            const cw = stw / dpr, ch = sth / dpr;
+            const bw = (SETTINGS.pxMin * zoomX) * 0.6;
+            
+            stctx.fillStyle = '#060A12';
+            stctx.fillRect(0, 0, cw, ch);
+
+            const rowH = ch / 4;
+            const labels = ["Ask", "Bid", "Delta", "Volume"];
+            const headerW = SETTINGS.profW || 60;
+
+            // Draw Headers
+            stctx.fillStyle = '#1F2937';
+            stctx.fillRect(0, 0, headerW, ch);
+            stctx.strokeStyle = '#374151';
+            stctx.lineWidth = 1;
+            
+            stctx.font = 'bold 10px Inter';
+            stctx.textAlign = 'left';
+            labels.forEach((label, i) => {
+                const y = i * rowH;
+                stctx.beginPath();
+                stctx.moveTo(0, y);
+                stctx.lineTo(headerW, y);
+                stctx.stroke();
+                stctx.fillStyle = '#9CA3AF';
+                stctx.fillText(label, 10, y + rowH/2 + 4);
+            });
+
+            // Draw Cells for each candle
+            bars.forEach(b => {
+                const x = getSX(b.t);
+                if (x + bw/2 < headerW || x - bw/2 > cw - SETTINGS.domW) return;
+
+                const ask = b.buys;
+                const bid = b.sells;
+                const delta = ask - bid;
+                const vol = b.v;
+                const isBull = delta >= 0;
+                
+                // Ask Row (Market Buys) - Always Green
+                stctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                stctx.fillRect(x - bw/2, 0, bw, rowH);
+                stctx.fillStyle = '#10B981';
+                stctx.font = '10px Roboto Mono';
+                stctx.textAlign = 'center';
+                stctx.fillText(formatVal(ask), x, rowH/2 + 4);
+
+                // Bid Row (Market Sells) - Always Red
+                stctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+                stctx.fillRect(x - bw/2, rowH, bw, rowH);
+                stctx.fillStyle = '#EF4444';
+                stctx.fillText(formatVal(bid), x, rowH + rowH/2 + 4);
+
+                // Delta Row - Dynamic color
+                stctx.fillStyle = isBull ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                stctx.fillRect(x - bw/2, rowH * 2, bw, rowH);
+                stctx.fillStyle = '#FFF';
+                stctx.fillText(formatVal(delta), x, rowH * 2 + rowH/2 + 4);
+
+                // Volume Row
+                stctx.fillStyle = 'rgba(55, 65, 81, 0.3)';
+                stctx.fillRect(x - bw/2, rowH * 3, bw, rowH);
+                stctx.fillStyle = '#D1D5DB';
+                stctx.fillText(formatVal(vol), x, rowH * 3 + rowH/2 + 4);
+                
+                // Vertical grid line
+                stctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                stctx.beginPath();
+                stctx.moveTo(x - bw/2, 0);
+                stctx.lineTo(x - bw/2, ch);
+                stctx.stroke();
+            });
+
+            function formatVal(v) {
+                const absV = Math.abs(v);
+                if (absV >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+                if (absV >= 1000) return (v / 1000).toFixed(1) + 'k';
+                return v.toFixed(0);
+            }
+        }
+
+        function updateBadgeOnly() { const s=STATES[SETTINGS.symbol]; if(!s || !s.bars.length) return; const {lastP, bars} = s; const b=document.getElementById('price-badge'); b.style.top=getSY(lastP)+'px'; b.innerText=lastP.toFixed(SETTINGS.tick < 0.01 ? 4 : 2); b.style.background=lastP>=bars[bars.length-1]?.o?THEME.up:THEME.dn; }
+        
+
+
+        // ===== TOUCH GESTURE HANDLERS (FIXED) =====
+        let touchPrevX = 0, touchPrevY = 0;
+        let pinchStartDist = 0, pinchStartZoomX = 1, pinchStartZoomY = 1;
+        let pinchStartCenterX = 0, pinchStartCenterY = 0;
+        let isPinching = false;
+        let touchVelX = 0, touchVelY = 0;
+        let inertiaRAF = null;
+        let longPressTmr = null;
+        const isMobile = () => window.innerWidth < 768;
+
+        function cancelInertia() {
+            if (inertiaRAF) { cancelAnimationFrame(inertiaRAF); inertiaRAF = null; }
+        }
+
+        function startInertia() {
+            cancelInertia();
+            const s = STATES[SETTINGS.symbol]; if (!s) return;
+            function step() {
+                touchVelX *= 0.88; touchVelY *= 0.88;
+                if (Math.abs(touchVelX) < 0.3 && Math.abs(touchVelY) < 0.3) { inertiaRAF = null; return; }
+                s.scrollX += touchVelX;
+                s.scrollY += touchVelY * (SETTINGS.tick / (SETTINGS.rowH * s.zoomY));
+                inertiaRAF = requestAnimationFrame(step);
+            }
+            inertiaRAF = requestAnimationFrame(step);
+        }
+
+        mainC.addEventListener('touchstart', e => {
+            e.preventDefault();
+            cancelInertia();
+            touchVelX = 0; touchVelY = 0;
+            const s = STATES[SETTINGS.symbol]; if (!s) return;
+
+            if (e.touches.length === 1) {
+                isPinching = false;
+                const rect = mainC.getBoundingClientRect();
+                touchPrevX = e.touches[0].clientX;
+                touchPrevY = e.touches[0].clientY;
+                mouseX = touchPrevX - rect.left;
+                mouseY = touchPrevY - rect.top;
+
+                if (activeTool !== 'cursor') {
+                    isDrawing = true;
+                    startP = getP(mouseY);
+                    startT = getT(mouseX);
+                    if (activeTool === 'hline') {
+                        drawings.push({ type: 'h-line', p: startP, color: THEME.cyn });
+                        isDrawing = false;
+                    }
+                    return;
+                }
+
+                // Long press shows crosshair
+                longPressTmr = setTimeout(() => {
+                    const rect = mainC.getBoundingClientRect();
+                    mouseX = e.touches[0].clientX - rect.left;
+                    mouseY = e.touches[0].clientY - rect.top;
+                }, 400);
+            } else if (e.touches.length === 2) {
+                clearTimeout(longPressTmr);
+                isPinching = true;
+                const t1 = e.touches[0], t2 = e.touches[1];
+                pinchStartDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                pinchStartZoomX = s.zoomX;
+                pinchStartZoomY = s.zoomY;
+                pinchStartCenterX = (t1.clientX + t2.clientX) / 2;
+                pinchStartCenterY = (t1.clientY + t2.clientY) / 2;
+                touchPrevX = pinchStartCenterX;
+                touchPrevY = pinchStartCenterY;
+            }
+        }, { passive: false });
+
+        mainC.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const s = STATES[SETTINGS.symbol]; if (!s) return;
+
+            if (e.touches.length === 1 && !isPinching) {
+                clearTimeout(longPressTmr);
+                const cx = e.touches[0].clientX;
+                const cy = e.touches[0].clientY;
+                const rect = mainC.getBoundingClientRect();
+                mouseX = cx - rect.left;
+                mouseY = cy - rect.top;
+
+                if (isDrawing) return; // Logic handled in render loop
+
+                const dx = cx - touchPrevX;
+                const dy = cy - touchPrevY;
+                
+                if (activeTool === 'cursor') {
+                    // Smooth delta accumulation - same pattern as mouse handler
+                    s.scrollX += dx;
+                    s.scrollY += dy * (SETTINGS.tick / (SETTINGS.rowH * s.zoomY));
+                    // Store velocity for inertia
+                    touchVelX = dx * 0.6 + touchVelX * 0.4;
+                    touchVelY = dy * 0.6 + touchVelY * 0.4;
+                }
+
+                touchPrevX = cx;
+                touchPrevY = cy;
+
+            } else if (e.touches.length === 2) {
+                const t1 = e.touches[0], t2 = e.touches[1];
+                const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+                const scale = dist / pinchStartDist;
+                // Detect axis: wider spread = horizontal zoom, taller = vertical zoom
+                const spanX = Math.abs(t2.clientX - t1.clientX);
+                const spanY = Math.abs(t2.clientY - t1.clientY);
+                if (spanX > spanY) {
+                    s.zoomX = Math.max(0.15, Math.min(12, pinchStartZoomX * scale));
+                } else {
+                    s.zoomY = Math.max(0.15, Math.min(12, pinchStartZoomY * scale));
+                }
+                // Also allow panning during pinch (center movement)
+                const cx = (t1.clientX + t2.clientX) / 2;
+                const cy = (t1.clientY + t2.clientY) / 2;
+                s.scrollX += cx - touchPrevX;
+                s.scrollY += (cy - touchPrevY) * (SETTINGS.tick / (SETTINGS.rowH * s.zoomY));
+                touchPrevX = cx;
+                touchPrevY = cy;
+            }
+        }, { passive: false });
+
+        mainC.addEventListener('touchend', e => {
+            clearTimeout(longPressTmr);
+            if (isDrawing) {
+                const endP = getP(mouseY), endT = getT(mouseX);
+                if (activeTool === 'box') {
+                    drawings.push({type:'box', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.tpo, opacity: 0.2});
+                } else if (activeTool === 'delta-prof') {
+                    const lastBar = STATES[SETTINGS.symbol]?.bars[STATES[SETTINGS.symbol].bars.length - 1];
+                    const isLive = lastBar ? (endT >= lastBar.t - SETTINGS.tfMs * 5) : true;
+                    drawings.push({type:'delta-profile', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.cyn, isLive: isLive});
+                } else if (activeTool === 'vol-prof') {
+                    const lastBar = STATES[SETTINGS.symbol]?.bars[STATES[SETTINGS.symbol].bars.length - 1];
+                    const isLive = lastBar ? (endT >= lastBar.t - SETTINGS.tfMs * 5) : true;
+                    drawings.push({type:'volume-profile', p1:startP, t1:startT, p2:endP, t2:endT, color: '#2962FF', isLive: isLive});
+                } else if (activeTool === 'tpo') {
+                    const lastBar = STATES[SETTINGS.symbol]?.bars[STATES[SETTINGS.symbol].bars.length - 1];
+                    const isLive = lastBar ? (endT >= lastBar.t - SETTINGS.tfMs * 5) : true;
+                    drawings.push({type:'tpo-profile', p1:startP, t1:startT, p2:endP, t2:endT, color: THEME.up, isLive: isLive});
+                }
+                isDrawing = false;
+            }
+
+            if (e.touches.length === 0) {
+                isPinching = false;
+                if (activeTool === 'cursor') startInertia(); // Momentum scroll
+            } else if (e.touches.length === 1) {
+                isPinching = false;
+                touchPrevX = e.touches[0].clientX;
+                touchPrevY = e.touches[0].clientY;
+                touchVelX = 0; touchVelY = 0;
+            }
+        }, { passive: false });
+
+        // Prevent page scroll when touching canvas
+        document.body.addEventListener('touchmove', e => {
+            if (e.target === mainC) e.preventDefault();
+        }, { passive: false });
+
+        // ===== MOBILE BOTTOM SHEET FUNCTIONS =====
+        let currentSheet = 'ind';
+        function openSheet(tab) {
+            currentSheet = tab;
+            ['ind','tf','sym'].forEach(t => {
+                document.getElementById('tab-'+t).style.display = t === tab ? '' : 'none';
+            });
+            const titles = { ind: 'INDICATORS', tf: 'TIMEFRAME', sym: 'SYMBOL' };
+            document.getElementById('sheet-title').textContent = titles[tab] || 'MENU';
+            document.getElementById('bottom-sheet').classList.add('open');
+            document.getElementById('sheet-overlay').style.display = 'block';
+        }
+        function closeSheet() {
+            document.getElementById('bottom-sheet').classList.remove('open');
+            document.getElementById('sheet-overlay').style.display = 'none';
+            document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('bnav-chart').classList.add('active');
+        }
+        function switchTab(tab) {
+            if (tab === 'chart') { closeSheet(); }
+            else { openSheet(tab); }
+        }
+        function sheetToggle(settingKey, btnId, el) {
+            SETTINGS[settingKey] = !SETTINGS[settingKey];
+            el.classList.toggle('on', SETTINGS[settingKey]);
+            const btn = document.getElementById(btnId);
+            if (btn) { if (SETTINGS[settingKey]) btn.classList.add('active'); else btn.classList.remove('active'); }
+        }
+        function toggleDrawTools(el) {
+            SETTINGS.showDrawTools = !SETTINGS.showDrawTools;
+            el.classList.toggle('on', SETTINGS.showDrawTools);
+            const toolbar = document.getElementById('drawing-toolbar');
+            if (toolbar) {
+                if (SETTINGS.showDrawTools) toolbar.classList.remove('hidden');
+                else toolbar.classList.add('hidden');
+            }
+        }
+        function toggleChartType(el) {
+            SETTINGS.chartType = SETTINGS.chartType === 'candle' ? 'line' : 'candle';
+            el.classList.toggle('on', SETTINGS.chartType === 'line');
+            const btn = document.getElementById('chart-type-btn');
+            if (btn) {
+                btn.innerText = SETTINGS.chartType.toUpperCase();
+                btn.classList.toggle('active', SETTINGS.chartType === 'line');
+            }
+        }
+        function setMobileTool(tool, el) {
+            activeTool = tool;
+            document.querySelectorAll('#tab-ind .sheet-toggle').forEach(b => b.classList.remove('on'));
+            el.classList.add('on');
+            document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+            const desktopBtn = document.getElementById('tool-' + tool);
+            if (desktopBtn) desktopBtn.classList.add('active');
+            closeSheet();
+        }
+        function setMobileTF(tf, el) {
+            document.querySelectorAll('#tab-tf .sheet-tf-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            SETTINGS.tf = tf;
+            const map = { '1m':60000, '5m':300000, '15m':900000, '1h':3600000, '2h':7200000, '4h':14400000, '1d':86400000 };
+            SETTINGS.tfMs = map[tf];
+            SETTINGS.stackedZones = [];
+            document.getElementById('tf-select').value = tf;
+            init(SETTINGS.symbol, SETTINGS.tick);
+            setTimeout(closeSheet, 350);
+        }
+        function quickSym(sym) {
+            closeSheet();
+            setTimeout(() => init(sym, null), 200);
+        }
+        function changeMobileSymbol() {
+            const val = document.getElementById('mobile-sym-input').value.trim().toUpperCase();
+            if (val) { closeSheet(); setTimeout(() => init(val, null), 200); }
+        }
+        // Swipe-down-to-close sheet
+        let sheetSwipeStartY = 0;
+        document.getElementById('bottom-sheet').addEventListener('touchstart', e => {
+            sheetSwipeStartY = e.touches[0].clientY;
+        }, { passive: true });
+        document.getElementById('bottom-sheet').addEventListener('touchend', e => {
+            if (e.changedTouches[0].clientY - sheetSwipeStartY > 70) closeSheet();
+        }, { passive: true });
+
+        // ===== MOBILE LAYOUT SETTINGS =====
+        if (window.innerWidth < 768) {
+            SETTINGS.showOIPanel   = false;
+            SETTINGS.showVSpdPanel = false;
+            SETTINGS.showTFHeatmap = false;
+            SETTINGS.showStats     = false;
+            SETTINGS.showOI        = false;
+            SETTINGS.showCVD       = false;
+            SETTINGS.showDOI       = false;
+            SETTINGS.showLiq       = false;
+            SETTINGS.showTrend     = false;
+            SETTINGS.showTIndex    = false;
+            SETTINGS.showGlowWalls = false;
+            SETTINGS.showImb       = false;
+            SETTINGS.showStk       = false;
+            SETTINGS.profW         = 0;       // No left volume profile → full chart width
+            SETTINGS.domW          = 60;      // Narrow right DOM
+            SETTINGS.pxMin         = 120;     // Keep pxMin, control via zoomX only
+            SETTINGS.rowH          = 20;      // Smaller row height for mobile
+        }
+
+        init();
+    </script>
+</body>
+</html>
